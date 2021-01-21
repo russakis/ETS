@@ -1,5 +1,5 @@
 import mysql.connector
-from msqlconfig import cursor, db
+from mysqlconfig import cursor, db
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,16 +27,18 @@ def mineral():
         cursor.execute(sql01)
         transall = cursor.fetchall()
         duplall = acqall + transall
-        sql = f"""select distinct tran.acquiringaccountholder
-            from transactions_new as tran, EUTL_Installations_orAir as inst
-            where tran.acquiringaccountholder = inst.onoma
-            and (inst.mainActivity='2' or inst.mainActivity='21')      
-            and TransactionDate LIKE '{month}%'"""
-        sql1= f"""select distinct tran.transferringaccountholder
-            from transactions_new as tran, EUTL_Installations_orAir as inst
-            where tran.transferringaccountholder = inst.onoma
-            and (inst.mainActivity='2' or inst.mainActivity='21')      
-            and TransactionDate LIKE '{month}%'"""
+        sql = f"""select tran.acquiringaccountholder
+                        from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
+                        where tran.acquiringaccountholder = acc.holdername
+                        and acc.rawcode=class.holder
+                        and (class.sector='2' or class.sector='21')
+                        and TransactionDate LIKE '{month}%'"""
+        sql1 = f"""select tran.transferringaccountholder
+                        from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
+                        where tran.transferringaccountholder = acc.holdername
+                        and acc.rawcode=class.holder
+                        and (class.sector='2' or class.sector='21')
+                        and TransactionDate LIKE '{month}%'"""
         cursor.execute(sql)
         acq = cursor.fetchall()
         cursor.execute(sql1)
@@ -68,18 +70,18 @@ def sector20():
         cursor.execute(sql01)
         transall = cursor.fetchall()
         duplall = acqall + transall
-        sql = f"""select distinct tran.acquiringaccountholder
-            from transactions_new as tran, EUTL_Installations_orAir as inst
-            where tran.acquiringaccountholder = inst.onoma
-            and (inst.country='DE' or inst.country='FR' or inst.country='NL')
-            and inst.mainActivity='20'       
-            and TransactionDate LIKE '{month}%'"""
-        sql1= f"""select distinct tran.transferringaccountholder
-            from transactions_new as tran, EUTL_Installations_orAir as inst
-            where tran.transferringaccountholder = inst.onoma
-            and (inst.country='DE' or inst.country='FR' or inst.country='NL')
-            and inst.mainActivity='20'       
-            and TransactionDate LIKE '{month}%'"""
+        sql = f"""select tran.acquiringaccountholder
+                from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
+                where tran.acquiringaccountholder = acc.holdername
+                and acc.rawcode=class.holder
+                and class.sector='20'
+                and TransactionDate LIKE '{month}%'"""
+        sql1 = f"""select tran.transferringaccountholder
+                from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
+                where tran.transferringaccountholder = acc.holdername
+                and acc.rawcode=class.holder
+                and class.sector='20'
+                and TransactionDate LIKE '{month}%'"""
         cursor.execute(sql)
         acq = cursor.fetchall()
         cursor.execute(sql1)
@@ -249,8 +251,8 @@ def countries():
     moneyfr()
     for ax in axs.flat:
         ax.set(xlabel='year', ylabel='% of transactions')
-    for ax in axs.flat:
-        ax.label_outer()
+    #for ax in axs.flat:
+    #    ax.label_outer()
 
 def sectors():
     mineral()
@@ -267,6 +269,5 @@ fig, axs = plt.subplots(2, 2)
 #   fig, sec = plt.subplots(2, 1)
 countries()
 #sectors()
-
 plt.show()
 

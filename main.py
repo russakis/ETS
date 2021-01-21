@@ -1,5 +1,5 @@
 import mysql.connector
-from msqlconfig import cursor, db
+from mysqlconfig import cursor, db
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -62,16 +62,18 @@ def mineral():#διυλιστήρια
         cursor.execute(sql01)
         transall = cursor.fetchall()
         duplall = acqall + transall
-        sql = f"""select distinct tran.acquiringaccountholder
-            from transactions_new as tran, EUTL_Installations_orAir as inst
-            where tran.acquiringaccountholder = inst.onoma
-            and (inst.mainActivity='2' or inst.mainActivity='21')      
-            and TransactionDate LIKE '{month}%'"""
-        sql1= f"""select distinct tran.transferringaccountholder
-            from transactions_new as tran, EUTL_Installations_orAir as inst
-            where tran.transferringaccountholder = inst.onoma
-            and (inst.mainActivity='2' or inst.mainActivity='21')      
-            and TransactionDate LIKE '{month}%'"""
+        sql = f"""select tran.acquiringaccountholder
+                from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
+                where tran.acquiringaccountholder = acc.holdername
+                and acc.rawcode=class.holder
+                and (class.sector='2' or class.sector='21')
+                and TransactionDate LIKE '{month}%'"""
+        sql1 = f"""select tran.transferringaccountholder
+                from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
+                where tran.transferringaccountholder = acc.holdername
+                and acc.rawcode=class.holder
+                and (class.sector='2' or class.sector='21')
+                and TransactionDate LIKE '{month}%'"""
         cursor.execute(sql)
         acq = cursor.fetchall()
         cursor.execute(sql1)
@@ -87,12 +89,12 @@ def sector20():#σεκτορ 20 για ολλανδία γαλλία γερμα�
     combx = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     comby = []
     for month in refer:
-        sql00 = f"""select distinct tran.acquiringaccountholder
+        sql00 = f"""select tran.acquiringaccountholder
         from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
         where tran.acquiringaccountholder = acc.holdername
         and acc.rawcode=class.holder
         and TransactionDate LIKE '{month}%'"""
-        sql01 = f"""select distinct tran.transferringaccountholder
+        sql01 = f"""select tran.transferringaccountholder
         from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
         where tran.transferringaccountholder = acc.holdername
         and acc.rawcode=class.holder
@@ -102,18 +104,18 @@ def sector20():#σεκτορ 20 για ολλανδία γαλλία γερμα�
         cursor.execute(sql01)
         transall = cursor.fetchall()
         duplall = acqall + transall
-        sql = f"""select distinct tran.acquiringaccountholder
-            from transactions_new as tran, EUTL_Installations_orAir as inst
-            where tran.acquiringaccountholder = inst.onoma
-            and (inst.country='DE' or inst.country='FR' or inst.country='NL')
-            and inst.mainActivity='20'       
-            and TransactionDate LIKE '{month}%'"""
-        sql1= f"""select distinct tran.transferringaccountholder
-            from transactions_new as tran, EUTL_Installations_orAir as inst
-            where tran.transferringaccountholder = inst.onoma
-            and (inst.country='DE' or inst.country='FR' or inst.country='NL')
-            and inst.mainActivity='20'       
-            and TransactionDate LIKE '{month}%'"""
+        sql= f"""select tran.acquiringaccountholder
+        from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
+        where tran.acquiringaccountholder = acc.holdername
+        and acc.rawcode=class.holder
+        and class.sector='20'
+        and TransactionDate LIKE '{month}%'"""
+        sql1 = f"""select tran.transferringaccountholder
+        from transactions_new as tran, eutl_accountholders as acc, eutl_accholderclassification as class
+        where tran.transferringaccountholder = acc.holdername
+        and acc.rawcode=class.holder
+        and class.sector='20'
+        and TransactionDate LIKE '{month}%'"""
         cursor.execute(sql)
         acq = cursor.fetchall()
         cursor.execute(sql1)
@@ -276,8 +278,8 @@ def countries():#βγάζει σε γράφημα τις 3 χώρες που ζ�
     moneyfr()
     for ax in axs.flat:
         ax.set(xlabel='month', ylabel='% of transactions')
-    for ax in axs.flat:
-        ax.label_outer()
+    #for ax in axs.flat:
+    #    ax.label_outer()
 
 def sectors():#βγάζει σε γράφημα τους 2 τομείς που ζητήθηκαν
     mineral()
