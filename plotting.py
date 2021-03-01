@@ -12,7 +12,112 @@ import collections
 import seaborn as sns #για ομορφιά
 from networkx.algorithms import community
 import time
+#import pygraphviz as pgv
+from plug import newplot
+from random import seed
+from random import random
 
+def controlroom(fromdate,todate,*args):
+    print(args)
+    if args==():
+        newplotting(fromdate,todate)
+    elif args[0]=="country":
+        countryaggr(fromdate,todate)
+
+#η γενική συνάρτηση στην οποία συμβαίνουν τα πάντα
+def newplotting(fromdate,todate):
+    G = nx.DiGraph()
+    trans = get_trans(fromdate, todate)
+    #print("trans",trans)
+    nodes=get_unique_nodes(fromdate, todate)
+    nodesup=[(i[0].upper(),i[1],i[2],i[3],i[4]) for i in nodes]#τα κάνω κεφαλαία
+    transup=[(i[0].upper(),i[1].upper(),i[2],i[3]) for i in trans]#τα κάνω κεφαλαία
+    #testingfun(nodes,trans)
+    trans = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο trans
+    G=nodify(nodesup,G)#φέρνω τους κόμβους σε καταλλληλη μορφή για το γράφημα
+    G=edgify(trans,G)#φέρνω τις ακμές σε κατάλληλη μορφή για το γράφημα
+    newplot(G)#κάλεσμα συνάρτησης από το plug.py για το σχεδιασμό
+    #nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
+    #plt.show()
+
+#συνάρτηση σαν την παραπάνω αλλά για την υλοποίηση node aggregation με βάση τη χώρα
+def countryaggr(fromdate,todate):
+    G = nx.DiGraph()
+    trans = get_trans_country(fromdate, todate)
+    nodes=get_unique_nodes(fromdate, todate)
+    nodesup=[(i[0].upper(),i[1],i[2],i[3],i[4]) for i in nodes]
+    transup=[(i[0].upper(),i[1].upper(),i[2],i[3]) for i in trans]
+    #trans = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο trans
+    G=nodifycountry(nodesup,G)
+    G=edgify(transup,G)
+    newplot(G)
+
+def testingfun(nodes,trans):
+    names = [item[0] for item in nodes]
+    #print(names)
+    #print(names.count('EUROPEAN COMMISSION'))
+
+def cleantrans2(trans,nodes):
+    tran = []
+    #make some transformations in order to search the list
+    nodename=[]
+    for i in nodes:
+        nodename.append(i[0])
+    """for i in range(len(trans)):
+        if trans[i][0] == "European Commission":
+            trans[i][0] = "EUROPEAN COMMISSION"
+        elif trans[i][1] == "European Commission":
+            trans[i][1]= "EUROPEAN COMMISSION"""""
+    for i in range(len(trans)):
+        if trans[i][0] =="European Commission" and trans[i][1] != "European Commission":
+            tran.append(("EUROPEAN COMMISSION",trans[i][1],trans[i][2],trans[i][3]))
+        elif trans[i][0] !="European Commission" and trans[i][1] == "European Commission":
+            tran.append((trans[i][0],"EUROPEAN COMMISSION",trans[i][2],trans[i][3]))
+        elif trans[i][0] =="European Commission" and trans[i][1] == "European Commission":
+            tran.append(("EUROPEAN COMMISSION","EUROPEAN COMMISSION",trans[i][2],trans[i][3]))
+        elif (trans[i][0] in nodename) or (trans[i][1] in nodename):
+            tran.append(trans[i])
+    #print(tran)
+    return tran
+
+
+
+def nodifycountry(nodes,G):
+    #coloring={"regulated":"blue","financial":"green","governmental":"yellow"}
+    node=[]
+    for i in nodes:
+        node.append((i[3], {"pos": (np.random.uniform(0, 10), np.random.uniform(0, 10))}))
+    G.add_nodes_from(node)
+    #print(node)
+    return G
+
+def nodify(nodes,G):
+    #coloring={"regulated":"blue","financial":"green","governmental":"yellow"}
+    node=[]
+    for i in nodes:
+        node.append((i[0], {"pos": locbycat(i[1])}))
+    G.add_nodes_from(node)
+    #print(node)
+    return G
+
+def edgify(trans,G):
+    tran=[]
+    for i in trans:
+        tran.append((i[0],i[1],i[2]))
+    G.add_weighted_edges_from(tran)
+    #print("tran:",tran)
+    return G
+
+def locbycat(type):
+    if type=="regulated":
+        pos=(np.random.uniform(4.7, 5.3),np.random.uniform(0, 10))
+    elif type=="financial":
+        pos=(np.random.uniform(8.7, 9.1),np.random.uniform(0, 10))
+    elif type=="governmental":
+        pos=(np.random.uniform(0.9, 1.3),np.random.uniform(0, 10))
+    else:
+        pos=(np.random.uniform(0, 10),np.random.uniform(0, 10))
+    return pos
 
 def cleandate(date):#ημερομηνία σε λίστα [μέρα,μήνας,έτος]
     clean=date.split("/")
@@ -65,6 +170,7 @@ def get_unique_nodes(fromdate,todate):#return list of unique account holders [('
     cursor.execute(sql2)
     tran = cursor.fetchall()
     all=get_unique(acq+tran)
+    #print("nodes",all)
     return all
 
 def getnodesalt(trans): #get nodes from transactions as list ["node1","node2"...]
@@ -78,22 +184,37 @@ def getnodesalt(trans): #get nodes from transactions as list ["node1","node2"...
 def get_trans(fromdate,todate): #συναλλαγές μεταξύ δυο ημερομηνιών
     fromd=cleandate(fromdate)
     tod=cleandate(todate)
-    key = 1 #1 for everything in, 2 for excluding NULL,
+    key = 2 #1 for everything in, 2 for excluding NULL,
     if key ==1 :
-        print("1")
         sql = f"""select transferringaccountholder, acquiringaccountholder, nbofunits, transactiontype
         from transactions_new where transactiondate 
         between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
     #If we want to exclude NULL appearances do the following
     elif key==2 :
-        print("2")
         sql = f"""select transferringaccountholder, acquiringaccountholder, nbofunits, transactiontype
         from transactions_new
         where ((transferringaccountholder is not NULL) and (acquiringaccountholder is not NULL))
         and transactiondate between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
     cursor.execute(sql)
     tran=cursor.fetchall()
-    print(len(tran))
+    return tran
+
+def get_trans_country(fromdate,todate):
+    fromd = cleandate(fromdate)
+    tod = cleandate(todate)
+    key = 2  # 1 for everything in, 2 for excluding NULL,
+    if key == 1:
+        sql = f"""select TransferringRegistry,AcquiringRegistry, nbofunits, transactiontype
+            from transactions_new where transactiondate 
+            between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+    # If we want to exclude NULL appearances do the following
+    elif key == 2:
+        sql = f"""select TransferringRegistry,AcquiringRegistry, nbofunits, transactiontype
+            from transactions_new
+            where ((transferringaccountholder is not NULL) and (acquiringaccountholder is not NULL))
+            and transactiondate between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+    cursor.execute(sql)
+    tran = cursor.fetchall()
     return tran
 
 def graphify(dic):
@@ -139,7 +260,7 @@ def fin(fromdate,todate):#μοναδικοί financial κόμβοι
     from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
     where tran.transferringaccountholder = acc.holdername
     and acc.rawcode = class.holder
-    and class.category='financial'
+    and class.category='regulated'
     and tran.transactiondate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
     cursor.execute(sql)
@@ -149,6 +270,31 @@ def fin(fromdate,todate):#μοναδικοί financial κόμβοι
     allfin=get_unique(acq+tran)
     return allfin
 
+def reg(fromdate,todate):#μοναδικοί regulated κόμβοι
+    fromd = cleandate(fromdate)
+    tod = cleandate(todate)
+    sql = f"""select tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry
+    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
+    where tran.acquiringaccountholder = acc.holdername
+    and acc.rawcode = class.holder
+    and class.category='financial'
+    and tran.transactiondate 
+    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+    sql2 = f"""select tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry
+    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
+    where tran.transferringaccountholder = acc.holdername
+    and acc.rawcode = class.holder
+    and class.category='regulated'
+    and tran.transactiondate 
+    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+    cursor.execute(sql)
+    acq = cursor.fetchall()
+    cursor.execute(sql2)
+    tran = cursor.fetchall()
+    allfin=get_unique(acq+tran)
+    return allfin
+
+
 def cleantrans(trans,nodes):
     tran=[]
     hashing=len(trans)*[0]
@@ -157,9 +303,9 @@ def cleantrans(trans,nodes):
             if nodes[i][0] == trans[j][0] or nodes[i][0] == trans[j][1]:
                 hashing[j]=1
     for i in range(len(trans)):
-        if hashing[i]==0:
+        if hashing[i]==1:
             tran.append(trans[i])
-    print(len(tran))
+    #print(tran)
     return tran
 
 def plotting(fromdate,todate):
@@ -173,9 +319,13 @@ def plotting(fromdate,todate):
     #dicinnodes=revdicify(trans)
     point02=time.time()
     print("point02",point02-point01)
+    get_unique_nodes(fromdate,todate)
     nodes=getnodesalt(trans)
     print(len(gov(fromdate,todate)))
-    nogovtrans=cleantrans(trans,gov(fromdate,todate))
+    #onlygov=cleantrans(trans,get_unique((fin(fromdate,todate)+reg(fromdate,todate))))
+    onlyfin=cleantrans(trans,get_unique((gov(fromdate,todate)+reg(fromdate,todate))))
+    #onlyreg=cleantrans(trans,get_unique((gov(fromdate,todate)+fin(fromdate,todate))))
+    #nogovtrans=cleantrans(trans,gov(fromdate,todate))
     point03= time.time()
     print("point03",point03-point02)
     #nodes=get_unique_nodes(fromdate,todate)
@@ -190,7 +340,7 @@ def plotting(fromdate,todate):
     #plt.show()
     #degreedistr(dicoutnodes) #για κατανομή βαθμών κορυφών έσω
     #degreedistr(dicinnodes) #για κατανομή βαθμών κορυφών έξω
-    mat=getmatrix(nogovtrans,nodes)
+    mat=getmatrix(onlyfin,nodes)
     simplematrix = getsimplematrix(mat)
     point1= time.time()
     print("point1 ",point1-point04)
@@ -200,6 +350,7 @@ def plotting(fromdate,todate):
     #density = nx.density(G)
     #nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
     nx.draw_kamada_kawai(G,alpha=0.2)
+    #newplot(G)
     point3=time.time()
     print("point3 ",point3-point2)
     plt.show()
@@ -302,14 +453,17 @@ def yearly():
         plotting(refer[i],refer[i+1])
 
 ignite()
-start=time.time()
+#start=time.time()
 #get_trans("29/6/2014","30/6/2014")
 #get_unique_nodes("29/6/2014","30/6/2014")
 #plotting("29/6/2014","30/7/2014")
-#nodeaggr("29/6/2014","30/7/2014","countrypollution")
 #plotting("29/3/2014","3/5/2014")
 #a = np.random.randint(0, 5, size=(15, 15))
 #D = nx.DiGraph(a)
 #nx.draw(D, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
-#yearly()
-#nullplot()
+#newplotting("29/6/2014","1/7/2014")
+#newplotting("29/9/2014","2/10/2014")
+#newplotting("9/2/2016","13/2/2016")
+#newplotting("5/5/2015","7/5/2015")
+#countryaggr("29/6/2014","1/7/2014")
+#controlroom("29/6/2014","1/7/2014","country")
