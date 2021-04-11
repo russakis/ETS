@@ -24,6 +24,10 @@ import netrd
 from matplotlib.backends.backend_pdf import PdfPages
 import deepgraph as dg
 import sys
+from portrait_divergence import portrait_divergence,portrait_divergence_weighted
+from pyvis.network import Network
+from IPython.core.display import display, HTML
+from drawgraph import draw_graph3
 
 
 def freedman_diaconis(data, returnas="width"):
@@ -276,18 +280,22 @@ def get_unique_nodes(fromdate,todate,category="None"):#return list of unique acc
 
     fromd = cleandate(fromdate)
     tod = cleandate(todate)
-    sql = f"""select distinct tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry, trade.tradeSize
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class,EUTL_AccHolderTransactingSize as trade
+    sql = f"""select distinct tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry, trade.tradeSize, pol.emitSize,karpf.tradeSize
+    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class,EUTL_AccHolderTransactingSize as trade,EUTL_AccHolderPollutingSize as pol,EUTL_AccHolderKarpfHolderSize as karpf
     where tran.acquiringaccountholder = acc.holdername
     and trade.holder = acc.rawcode
+    and karpf.holder = acc.rawcode
+    and pol.holder = acc.rawcode
     and acc.rawcode = class.holder
     {addition}
     and tran.transactiondate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    sql2 = f"""select distinct tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry,trade.tradeSize
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class,EUTL_AccHolderTransactingSize as trade
+    sql2 = f"""select distinct tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry,trade.tradeSize, pol.emitSize ,karpf.tradeSize
+    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class,EUTL_AccHolderTransactingSize as trade,EUTL_AccHolderPollutingSize as pol, EUTL_AccHolderKarpfHolderSize as karpf
     where tran.transferringaccountholder = acc.holdername
     and trade.holder = acc.rawcode
+    and karpf.holder = acc.rawcode
+    and pol.holder = acc.rawcode
     and acc.rawcode = class.holder
     {addition}
     and tran.transactiondate 
@@ -894,8 +902,10 @@ def testin():
     G2.add_edges_from(edges2)
     G2.add_edge("UK","France")
     print("printing distance")
-    d = netrd.distance.DeltaCon().dist(G1, G1,exact=False)
-    print(d)
+    #d = netrd.distance.DeltaCon().dist(G1, G1)
+    d = portrait_divergence(G1,G2)
+    d1 = portrait_divergence_weighted(G1,G2)
+    print(d,d1)
 
 def toleda(month,year):
     months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
@@ -908,17 +918,23 @@ def toleda(month,year):
     print(dates[minas][0]+str(year),dates[minas][1]+str(year))
     G=controlroom(dates[minas][0]+str(year),dates[minas][1]+str(year))
     nodes=list(G.nodes)
+    nodesindex=[nodes.index(node) for node in nodes]
+    print(nodesindex)
     edges=list(G.edges)
+    edgesindex=[]
+    for edge in edges:
+        edgesindex.append((nodes.index(edge[0]),nodes.index(edge[1])))
+    print(edgesindex)
     print("wegotthisfar")
     #print("how bout dem nodes",nodes,"how bout dem edges",edges)
     f = open(f"{month}{year}.gw", "w")
-    print("#header section","LEDA.GRAPH","string","void","-1","#nodes section",len(nodes),sep='\n',file=f)
-    for i in nodes:
-        print("|{"+i+"}]",file=f)
+    print("#header section","LEDA.GRAPH","string","void","-1","#nodes section",len(nodesindex),sep='\n',file=f)
+    for i in nodesindex:
+        print("|{"+str(i)+"}|",file=f)
     print("\n", file = f)
-    print("#edges section",len(edges),sep="\n",file=f)
-    for j in range(len(edges)):
-        print(edges[j][0],edges[j][1],"0","|{}|",sep=">",file = f)
+    print("#edges section",len(edgesindex),sep="\n",file=f)
+    for j in range(len(edgesindex)):
+        print(edgesindex[j][0],edgesindex[j][1],"0","|{}|",sep=" ",file = f)
     f.close()
 
 def edgeli(month,year):
@@ -980,8 +996,94 @@ def portrait(fromdate1,todate1,fromdate2,todate2):
     H4 = loseweight(G4)
     portrait = netrd.distance.PortraitDivergence().dist(G3,G4)
     portrait2 = netrd.distance.PortraitDivergence().dist(H3,H4)
-
     print(portrait,portrait2)
+    port1 = portrait_divergence_weighted(G3,G4)
+    port2 = portrait_divergence(H3,H4)
+    port3 = portrait_divergence_weighted(G1,G2)
+    port4 = portrait_divergence_weighted(H1,H2)
+    print("this be some new undirected shit",port1,port2)
+    print("this be some new directed shit",port3,port4)
+
+
+def example():
+    G1 = nx.Graph()
+    G2 = nx.Graph()
+    edges1 = [("UK", "Denmark"), ("UK", "Germany"), ("UK", "Spain"), ("UK", "Greece")]
+    edges2 = [("UK", "Denmark"), ("UK", "Spain"), ("UK", "France"), ("UK", "Germany"), ("Germany", "Greece")]
+    G1.add_edges_from(edges1)
+    #G2=G1
+    G2.add_edges_from(edges2)
+    nodes = list(G1.nodes)
+    edges = list(G1.edges)
+    nodes2 = list(G2.nodes)
+    edges2 = list(G2.edges)
+    f = open("example.gw", "w")
+    print("#header section", "LEDA.GRAPH", "string", "void", "-1", "#nodes section", len(nodes), sep='\n', file=f)
+    for i in nodes:
+        print("|{" + i + "}]", file=f)
+    print("\n", file=f)
+    print("#edges section", len(edges), sep="\n", file=f)
+    for j in range(len(edges)):
+        print(edges[j][0], edges[j][1], "0", "|{}|", sep=" ", file=f)
+    f.close()
+    f = open("example2.gw", "w")
+    print("#header section", "LEDA.GRAPH", "string", "void", "-1", "#nodes section", len(nodes2), sep='\n', file=f)
+    for i in nodes2:
+        print("|{" + i + "}]", file=f)
+    print("\n", file=f)
+    print("#edges section", len(edges2), sep="\n", file=f)
+    for j in range(len(edges2)):
+        print(edges2[j][0], edges2[j][1], "0", "|{}|", sep=" ", file=f)
+    f.close()
+def test2():
+    G1=nx.complete_graph(20)
+    G2=nx.path_graph(20)
+    G3=nx.barabasi_albert_graph(20,5)
+    nodes = list(G1.nodes)
+    edges = list(G1.edges)
+    nodes2 = list(G2.nodes)
+    edges2 = list(G2.edges)
+    f = open("clique" +str(len(nodes))+".gw", "w")
+    print("#header section", "LEDA.GRAPH", "string", "void", "-1", "#nodes section", len(nodes), sep='\n', file=f)
+    for i in nodes:
+        print("|{" + str(i) + "}]", file=f)
+    print("\n", file=f)
+    print("#edges section", len(edges), sep="\n", file=f)
+    for j in range(len(edges)):
+        print(edges[j][0], edges[j][1], "0", "|{}|", sep=" ", file=f)
+    f.close()
+    f = open("path" +str(len(nodes))+".gw", "w")
+    print("#header section", "LEDA.GRAPH", "string", "void", "-1", "#nodes section", len(nodes2), sep='\n', file=f)
+    for i in nodes2:
+        print("|{" + str(i) + "}]", file=f)
+    print("\n", file=f)
+    print("#edges section", len(edges2), sep="\n", file=f)
+    for j in range(len(edges2)):
+        print(edges2[j][0], edges2[j][1], "0", "|{}|", sep=" ", file=f)
+
+    print(portrait_divergence(G1,G2))
+    print(portrait_divergence(G2,G3))
+    f.close()
+
+def wecompin():
+    G1=controlroom("1/3/2012","30/3/2012")
+    G2=nx.powerlaw_cluster_graph(len(list(G1.nodes)),len(list(G1.edges)),0.4)
+    port=portrait_divergence(G1,G2)
+    print(port)
+
+def pyvistest():
+    G=controlroom("1/4/2011","30/4/2011")
+    #nt = Network('1000px', '1000px')
+    nt = Network(notebook=True)
+    nt.from_nx(G)
+    #nt.show_buttons(filter=['physics'])
+    nt.show_buttons()
+    nt.show('nx.html')
+    #display(HTML('nx.html'))
+    #nt.enable_physics(True)
+    #nt.show('mygraph.html')
+
+
 
 ignite()
 #start=time.time()
@@ -1018,8 +1120,12 @@ ignite()
 #pp = PdfPages('weights.pdf')
 #multiple("sdaf","asdf")
 #pp.close()
-#toleda("July",2013)
+#toleda("April",2013)
 #edgeli("July",2013)
 #portrait("1/2/2012","28/2/2012","1/4/2013","30/4/2013")
 #portrait("1/4/2012","30/4/2012","1/4/2013","30/4/2013")
-testin()
+#testin()
+#exatmple()
+#test2()
+#wecompin()
+pyvistest()
