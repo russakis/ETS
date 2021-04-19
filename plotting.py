@@ -28,6 +28,11 @@ from portrait_divergence import portrait_divergence,portrait_divergence_weighted
 from pyvis.network import Network
 from IPython.core.display import display, HTML
 from drawgraph import draw_graph3
+import xlrd
+import os
+import csv
+
+
 
 
 def freedman_diaconis(data, returnas="width"):
@@ -70,7 +75,7 @@ def rtosnake():
     f.write()
     f.close()
 
-def controlroom(fromdate,todate,*args,category="None",restriction="None"):
+def controlroom(fromdate,todate,category="None",restriction="None",*args):
     if args==():
         G=newplotting(fromdate,todate,category,restriction)
     elif args[0]=="country":
@@ -86,16 +91,19 @@ def controlroom(fromdate,todate,*args,category="None",restriction="None"):
 #η γενική συνάρτηση στην οποία συμβαίνουν τα πάντα
 def newplotting(fromdate,todate,category="None",restriction="None"):
     G = nx.DiGraph()
+    print("stage1")
     trans = get_trans(fromdate, todate, restriction)
     #print("trans",trans)
     nodes=get_unique_nodes(fromdate, todate,category)
+    print("stage2")
     #nodes=cleannodes(nodes,trans)#αφαιρεί κόμβους που δεν έχουν ακμή(χρειάζομαι connected graph)
     nodesup=[(i[0].upper(),i[1],i[2],i[3],i[4]) for i in nodes]#τα κάνω κεφαλαία
     transup=[(i[0].upper(),i[1].upper(),i[2],i[3]) for i in trans]#τα κάνω κεφαλαία
+    print("stage3")
     transup = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
     #trans=thecleanest(trans,nodes)
     transup = cleantransloop(transup)
-    nodesup = cleannodes(nodesup,transup)
+    nodesup = cleannodes(nodesup,transup) #στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
     print("these are trans homie:",len(transup),"these dem nodes",len(nodesup))
     #testingfun(nodes,trans)
     #print(nodesup)
@@ -118,11 +126,6 @@ def countryaggr(fromdate,todate):
     G=nodifycountry(nodesup,G)
     G=edgify(transup,G)
     newplot(G)
-
-def testingfun(nodes,trans):
-    names = [item[0] for item in nodes]
-    #print(names)
-    #print(names.count('EUROPEAN COMMISSION'))
 
 def cleannodes(nodes,trans):
     cleannodes=[]
@@ -270,41 +273,41 @@ def get_unique_nodes(fromdate,todate,category="None"):#return list of unique acc
     if category == "None":
         addition = ""
     elif "," not in category:
-        addition = f"and class.category = '{category}'"
+        addition = f"\nand class.category = '{category}'"
     elif len(category.split(","))==2:
         things=category.split(",")
-        addition = f"and (class.category = '{things[0]}' or class.category = '{things[1]}'"
+        addition = f"\nand (class.category = '{things[0]}' or class.category = '{things[1]}')"
+        print(addition)
     else:
         things=category.split(",")
-        addition = f"and (class.category = '{things[0]}' or class.category = '{things[1]} or or class.category = '{things[2]}'"
+        addition = f"\nand (class.category = '{things[0]}' or class.category = '{things[1]} or or class.category = '{things[2]}')"
 
+    print("Addition","l"+addition+"l")
     fromd = cleandate(fromdate)
     tod = cleandate(todate)
-    sql = f"""select distinct tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry, trade.tradeSize, pol.emitSize,karpf.tradeSize
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class,EUTL_AccHolderTransactingSize as trade,EUTL_AccHolderPollutingSize as pol,EUTL_AccHolderKarpfHolderSize as karpf
+    sql = f"""select distinct tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry
+    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
     where tran.acquiringaccountholder = acc.holdername
-    and trade.holder = acc.rawcode
-    and karpf.holder = acc.rawcode
-    and pol.holder = acc.rawcode
-    and acc.rawcode = class.holder
-    {addition}
+    and acc.rawcode = class.holder{addition}
     and tran.transactiondate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    sql2 = f"""select distinct tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry,trade.tradeSize, pol.emitSize ,karpf.tradeSize
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class,EUTL_AccHolderTransactingSize as trade,EUTL_AccHolderPollutingSize as pol, EUTL_AccHolderKarpfHolderSize as karpf
+    print("stage1.1")
+    sql2 = f"""select distinct tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry
+    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
     where tran.transferringaccountholder = acc.holdername
-    and trade.holder = acc.rawcode
-    and karpf.holder = acc.rawcode
-    and pol.holder = acc.rawcode
-    and acc.rawcode = class.holder
-    {addition}
+    and acc.rawcode = class.holder{addition}
     and tran.transactiondate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+    print("stage1.2")
+    print(sql)
     cursor.execute(sql)
     acq = cursor.fetchall()
+    print("stage1.3")
     cursor.execute(sql2)
     tran = cursor.fetchall()
+    print("stage1.4")
     all=get_unique(acq+tran)
+    print("stage1.5")
     #print("nodes",all)
     return all
 
@@ -914,18 +917,18 @@ def toleda(month,year):
              ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
         , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
     minas=months.index(month)
-    print("minas",minas)
-    print(dates[minas][0]+str(year),dates[minas][1]+str(year))
+    #print("minas",minas)
+    #print(dates[minas][0]+str(year),dates[minas][1]+str(year))
     G=controlroom(dates[minas][0]+str(year),dates[minas][1]+str(year))
     nodes=list(G.nodes)
     nodesindex=[nodes.index(node) for node in nodes]
-    print(nodesindex)
+    #print(nodesindex)
     edges=list(G.edges)
     edgesindex=[]
     for edge in edges:
         edgesindex.append((nodes.index(edge[0]),nodes.index(edge[1])))
-    print(edgesindex)
-    print("wegotthisfar")
+    #print(edgesindex)
+    #print("wegotthisfar")
     #print("how bout dem nodes",nodes,"how bout dem edges",edges)
     f = open(f"{month}{year}.gw", "w")
     print("#header section","LEDA.GRAPH","string","void","-1","#nodes section",len(nodesindex),sep='\n',file=f)
@@ -944,13 +947,13 @@ def edgeli(month,year):
              ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
         , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
     minas = months.index(month)
-    print("minas", minas)
-    print(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    #print("minas", minas)
+    #print(dates[minas][0] + str(year), dates[minas][1] + str(year))
     G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
     edges=list(G.edges)
     f = open(f"edgelist-{month}{year}.gw", "w")
-    for edge in edges:
-        print(edge[0],edge[1],file=f)
+    #for edge in edges:
+        #print(edge[0],edge[1],file=f)
     f.close()
 
 def jacc(fromdate1,todate1,fromdate2,todate2):
@@ -1066,8 +1069,9 @@ def test2():
     f.close()
 
 def wecompin():
-    G1=controlroom("1/3/2012","30/3/2012")
-    G2=nx.powerlaw_cluster_graph(len(list(G1.nodes)),len(list(G1.edges)),0.4)
+    #G1=controlroom("1/3/2012","30/3/2012")
+    #G2=nx.barabasi_albert_graph(len(list(G1.nodes)),1)
+    G1=nx.path_graph()
     port=portrait_divergence(G1,G2)
     print(port)
 
@@ -1083,8 +1087,151 @@ def pyvistest():
     #nt.enable_physics(True)
     #nt.show('mygraph.html')
 
+def visual(month,year,category="None"):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    minas = months.index(month)
+    G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year),category=category)
+    nt = Network(notebook=True)
+    nt.from_nx(G)
+    nt.show_buttons()
+    nt.show(f"{month}{year}.html")
 
+def doingrand():
+    #G1=controlroom("1/3/2012","30/3/2012")
+    G=nx.watts_strogatz_graph(200,2,0.1)
+    nt = Network(notebook=True)
+    nt.from_nx(G)
+    nt.show_buttons()
+    nt.show('watts.html')
+    G1=nx.newman_watts_strogatz_graph(200,2,0.1)
+    nt1 = Network(notebook=True)
+    nt1.from_nx(G1)
+    nt1.show_buttons()
+    nt1.show('newman.html')
 
+def sotiris():
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    for i in range(3):
+        for j in months:
+            toleda(j,2010+i)
+
+def manytests():
+    lis=[10,20]
+    graphs=[]
+    for i in lis:
+        graphs.append(nx.path_graph(i))
+        graphs.append(nx.cycle_graph(i))
+        graphs.append(nx.complete_graph(i))
+        graphs.append(nx.grid_graph((i,i)))
+        graphs.append(nx.star_graph(i))
+        graphs.append(nx.ladder_graph(i))
+        graphs.append(nx.wheel_graph(i))
+    f= open('portraittrials.txt','w+')
+    indices=["path","cycle","clique","grid","star","ladder","wheel"]
+    strs=[""]*len(graphs)
+    print(strs)
+    counter=0
+    for i in range(len(strs)):
+        print(counter//len(indices))
+        print("counter",counter)
+        strs[i]=str(indices[i%len(indices)]) + str(lis[counter//len(indices)]) + "\t"
+        counter+=1
+    print(strs)
+    for i in range(len(graphs)):
+        for j in range(i):
+            print(i,j)
+            strs[i]= strs[i] + "\t" + str(format(portrait_divergence(graphs[i],graphs[j]),'.4f')) + "\t"
+    for i in strs:
+        print(i, file=f)
+    f.close()
+
+def manytests2():
+    lis = [10, 20, 50, 100]
+    graphs = []
+    for i in lis:
+        graphs.append(nx.path_graph(i))
+        graphs.append(nx.cycle_graph(i))
+        graphs.append(nx.complete_graph(i))
+        graphs.append(nx.grid_graph((i, i)))
+        graphs.append(nx.star_graph(i))
+        graphs.append(nx.ladder_graph(i))
+        graphs.append(nx.wheel_graph(i))
+    indices = ["path", "cycle", "clique", "grid", "star", "ladder", "wheel"]
+    strs = [""] * len(graphs)
+    #print(strs)
+    counter = 0
+    #for i in range(len(strs)):
+    #    print(counter // len(indices))
+    #    print("counter", counter)
+    #    strs[i] = str(indices[i % len(indices)]) + str(lis[counter // len(indices)]) + " "
+    #    counter += 1
+    #print(strs)
+    for i in range(len(graphs)):
+        for j in range(i+1):
+            print(i,j)
+            strs[i]= strs[i] + " " + str(format(portrait_divergence(graphs[i],graphs[j]),'.4f')) + " "
+    empt=[]
+    colum=[]
+    counter = 0
+    for i in range(len(graphs)):
+        colum.append(str(indices[i % len(indices)]) + str(lis[counter // len(indices)]))
+        counter += 1
+    for i in strs:
+        empt.append(i.split())
+    #for i in empt:
+    data={}
+    for i in range(len(colum)):
+        data[colum[i]]=[0.0]*len(colum)
+        for j in range(i+1):
+            data[colum[i]][j]=float(empt[i][j])
+    #for i in range(len(colum)):
+    #    for j in range(i+1):
+    #        data[colum[j]][i]=empt[j][i]
+    #mat = np.matrix(empt)
+    #df = pd.DataFrame(data=empt,columns=colum)
+    df=pd.DataFrame(data)
+    #print("df",df)
+    #df.to_csv('outfile.csv')
+    #with open('portraittests.txt', 'wb') as f:
+    #    for line in mat:
+    #        np.savetxt(f, line)
+    #np.savetxt(r'/Users/user/PycharmProjects/secondtry/outwithit.txt', df.values,fmt='%1.3f')
+    nup=df.to_numpy()
+    #print("nup",nup)
+    for i in range(len(nup)):
+        for j in range(i):
+            nup[i][j]=nup[j][i]
+    #print(nup)
+    f=open("portrait_stats.csv","w+")
+    col=["columns"]+colum
+    final=[]
+    final.append(', '.join(col))
+    for i in range(len(nup)):
+        final.append(colum[i]+", "+', '.join(map(str,nup[i])))
+    for i in final:
+        print(i,file=f)
+    f.close()
+
+def doit():
+    a = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+    mat = np.matrix(a)
+    with open('outfile.txt', 'wb') as f:
+        for line in mat:
+            np.savetxt(f, line, fmt='%.2f')
+
+def tempgraph():
+    #G = nx.grid_graph((50, 50))
+    G= nx.wheel_graph(50)
+    print(nx.is_directed(G))
+    nt = Network(notebook=True)
+    nt.from_nx(G)
+    nt.show_buttons()
+    nt.show('wheel.html')
 ignite()
 #start=time.time()
 #get_trans("29/6/2014","30/6/2014")
@@ -1128,4 +1275,13 @@ ignite()
 #exatmple()
 #test2()
 #wecompin()
-pyvistest()
+#pyvistest()
+#visual("September",2012,"regulated,financial")
+#weightdist("1/3/2012","31/3/2012","governmental")
+#controlroom("1/9/2012","30/9/2012","governmental,regulated")
+#doingrand()
+#toleda("November",2011)
+#sotiris()
+#manytests2()
+tempgraph()
+#doit()
