@@ -89,22 +89,22 @@ def controlroom(fromdate,todate,category="None",restriction="None",*args):
     return G
 
 #η γενική συνάρτηση στην οποία συμβαίνουν τα πάντα
-def newplotting(fromdate,todate,category="None",restriction="None"):
+def newplotting(fromdate,todate,category="None",restriction="None",aggregation="None"):
     G = nx.DiGraph()
-    print("stage1")
+    #print("stage1")
     trans = get_trans(fromdate, todate, restriction)
     #print("trans",trans)
     nodes=get_unique_nodes(fromdate, todate,category)
-    print("stage2")
+    #print("stage2")
     #nodes=cleannodes(nodes,trans)#αφαιρεί κόμβους που δεν έχουν ακμή(χρειάζομαι connected graph)
     nodesup=[(i[0].upper(),i[1],i[2],i[3],i[4]) for i in nodes]#τα κάνω κεφαλαία
     transup=[(i[0].upper(),i[1].upper(),i[2],i[3]) for i in trans]#τα κάνω κεφαλαία
-    print("stage3")
+    #print("stage3")
     transup = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
     #trans=thecleanest(trans,nodes)
     transup = cleantransloop(transup)
     nodesup = cleannodes(nodesup,transup) #στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
-    print("these are trans homie:",len(transup),"these dem nodes",len(nodesup))
+    #print("these are trans homie:",len(transup),"these dem nodes",len(nodesup))
     #testingfun(nodes,trans)
     #print(nodesup)
     #trans = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο trans
@@ -115,6 +115,7 @@ def newplotting(fromdate,todate,category="None",restriction="None"):
     #plt.show()
     #dg.plot_2d()
     return G
+
 #συνάρτηση σαν την παραπάνω αλλά για την υλοποίηση node aggregation με βάση τη χώρα
 def countryaggr(fromdate,todate):
     G = nx.DiGraph()
@@ -126,6 +127,7 @@ def countryaggr(fromdate,todate):
     G=nodifycountry(nodesup,G)
     G=edgify(transup,G)
     newplot(G)
+    return G
 
 def cleannodes(nodes,trans):
     cleannodes=[]
@@ -172,30 +174,6 @@ def cleanedges(edges,nodes):
         if hashing[i]==1:
             edgesss.append(edges[i])
     return edgesss
-
-def cleantrans2(trans,nodes):
-    tran = []
-    #make some transformations in order to search the list
-    nodename=[]
-    for i in nodes:
-        nodename.append(i[0])
-    """for i in range(len(trans)):
-        if trans[i][0] == "European Commission":
-            trans[i][0] = "EUROPEAN COMMISSION"
-        elif trans[i][1] == "European Commission":
-            trans[i][1]= "EUROPEAN COMMISSION"""""
-    for i in range(len(trans)):
-        if trans[i][0] =="European Commission" and trans[i][1] != "European Commission":
-            tran.append(("EUROPEAN COMMISSION",trans[i][1],trans[i][2],trans[i][3]))
-        elif trans[i][0] !="European Commission" and trans[i][1] == "European Commission":
-            tran.append((trans[i][0],"EUROPEAN COMMISSION",trans[i][2],trans[i][3]))
-        elif trans[i][0] =="European Commission" and trans[i][1] == "European Commission":
-            tran.append(("EUROPEAN COMMISSION","EUROPEAN COMMISSION",trans[i][2],trans[i][3]))
-        elif (trans[i][0] in nodename) or (trans[i][1] in nodename):
-            tran.append(trans[i])
-    #print(tran)
-    return tran
-
 
 
 def nodifycountry(nodes,G):
@@ -277,12 +255,11 @@ def get_unique_nodes(fromdate,todate,category="None"):#return list of unique acc
     elif len(category.split(","))==2:
         things=category.split(",")
         addition = f"\nand (class.category = '{things[0]}' or class.category = '{things[1]}')"
-        print(addition)
     else:
         things=category.split(",")
         addition = f"\nand (class.category = '{things[0]}' or class.category = '{things[1]} or or class.category = '{things[2]}')"
 
-    print("Addition","l"+addition+"l")
+    #print("Addition","l"+addition+"l")
     fromd = cleandate(fromdate)
     tod = cleandate(todate)
     sql = f"""select distinct tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry
@@ -291,23 +268,23 @@ def get_unique_nodes(fromdate,todate,category="None"):#return list of unique acc
     and acc.rawcode = class.holder{addition}
     and tran.transactiondate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    print("stage1.1")
+    #print("stage1.1")
     sql2 = f"""select distinct tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry
     from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
     where tran.transferringaccountholder = acc.holdername
     and acc.rawcode = class.holder{addition}
     and tran.transactiondate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    print("stage1.2")
-    print(sql)
+    #print("stage1.2")
+    #print(sql)
     cursor.execute(sql)
     acq = cursor.fetchall()
-    print("stage1.3")
+    #print("stage1.3")
     cursor.execute(sql2)
     tran = cursor.fetchall()
-    print("stage1.4")
+    #print("stage1.4")
     all=get_unique(acq+tran)
-    print("stage1.5")
+    #print("stage1.5")
     #print("nodes",all)
     return all
 
@@ -365,79 +342,6 @@ def graphify(dic):
     df = pd.DataFrame(dic)
     G = nx.from_pandas_edgelist(df, 'from', 'to', create_using=nx.DiGraph())
     nx.draw(G, with_labels=False, node_size=1500, alpha=0.3, arrows=True)
-
-def gov(fromdate,todate):#μοναδικοί governmental κόμβοι
-    fromd = cleandate(fromdate)
-    tod = cleandate(todate)
-    sql = f"""select tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-    where tran.acquiringaccountholder = acc.holdername
-    and acc.rawcode = class.holder
-    and class.category='governmental'
-    and tran.transactiondate 
-    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    sql2 = f"""select tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-    where tran.transferringaccountholder = acc.holdername
-    and acc.rawcode = class.holder
-    and class.category='governmental'
-    and tran.transactiondate 
-    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    cursor.execute(sql)
-    acq = cursor.fetchall()
-    cursor.execute(sql2)
-    tran = cursor.fetchall()
-    allgov=get_unique(acq+tran)
-    return allgov
-
-def fin(fromdate,todate):#μοναδικοί financial κόμβοι
-    fromd = cleandate(fromdate)
-    tod = cleandate(todate)
-    sql = f"""select tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-    where tran.acquiringaccountholder = acc.holdername
-    and acc.rawcode = class.holder
-    and class.category='financial'
-    and tran.transactiondate 
-    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    sql2 = f"""select tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-    where tran.transferringaccountholder = acc.holdername
-    and acc.rawcode = class.holder
-    and class.category='regulated'
-    and tran.transactiondate 
-    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    cursor.execute(sql)
-    acq = cursor.fetchall()
-    cursor.execute(sql2)
-    tran = cursor.fetchall()
-    allfin=get_unique(acq+tran)
-    return allfin
-
-def reg(fromdate,todate):#μοναδικοί regulated κόμβοι
-    fromd = cleandate(fromdate)
-    tod = cleandate(todate)
-    sql = f"""select tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-    where tran.acquiringaccountholder = acc.holdername
-    and acc.rawcode = class.holder
-    and class.category='financial'
-    and tran.transactiondate 
-    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    sql2 = f"""select tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-    where tran.transferringaccountholder = acc.holdername
-    and acc.rawcode = class.holder
-    and class.category='regulated'
-    and tran.transactiondate 
-    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    cursor.execute(sql)
-    acq = cursor.fetchall()
-    cursor.execute(sql2)
-    tran = cursor.fetchall()
-    allfin=get_unique(acq+tran)
-    return allfin
-
 
 
 def plotting(fromdate,todate):
@@ -576,13 +480,6 @@ def nodeaggr(fromdate,todate,aggr):
     G = nx.from_pandas_edgelist(df, 'from', 'to', create_using=nx.DiGraph())
     nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
     plt.show()
-
-def yearly():
-    refer=["01/01/14","01/02/14","01/03/14","01/04/14","01/05/14","01/06/14","01/07/14","01/08/14","01/09/14","01/10/14","01/11/14","01/12/14","01/01/15"]
-    refer2=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"]
-    for i in range(len(refer)-1):
-        print(refer2[i])
-        plotting(refer[i],refer[i+1])
 
 def degreedist(G):
     degree_sequence = sorted([d for n, d in G.degree()], reverse=True)  # degree sequence
@@ -1233,6 +1130,113 @@ def tempgraph():
     nt.show_buttons()
     nt.show('wheel.html')
 ignite()
+
+def reggovfin(month,year):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    minas = months.index(month)
+    G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    print("all edges",len(list(G.edges)))
+    all=len(list(G.edges))
+    G1 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year),"regulated")
+    regedges = len(list(G1.edges))
+    print("between regulated",regedges,f'{regedges/all*100:.3g}%')
+    G2 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "governmental")
+    govedges = len(list(G2.edges))
+    print("between governmental",govedges,f'{govedges/all*100:.3g}%')
+    G3 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "financial")
+    finedges= len(list(G3.edges))
+    print("between financial",finedges,f'{finedges/all*100:.3g}%')
+    G4 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated,financial")
+    regfin =len(list(G4.edges))- len(list(G1.edges))-len(list(G3.edges))
+    print("between regulated and financial",regfin,f'{regfin/all*100:.3g}%')
+    G5 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated,governmental")
+    reggov = len(list(G5.edges)) - len(list(G1.edges)) - len(list(G2.edges))
+    print("between regulated and governmental", reggov,f'{reggov/all*100:.3g}%')
+    G6 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "governmental,financial")
+    fingov = len(list(G6.edges)) - len(list(G2.edges)) - len(list(G3.edges))
+    print("between governmental and financial", fingov,f'{fingov/all*100:.3g}%')
+
+def trials(month,year):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    minas = months.index(month)
+    lis = [10, 20, 50, 100]
+    graphs = []
+    G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    for i in lis:
+        graphs.append(nx.path_graph(i))
+        graphs.append(nx.cycle_graph(i))
+        graphs.append(nx.complete_graph(i))
+        graphs.append(nx.grid_graph((i, i)))
+        graphs.append(nx.star_graph(i))
+        graphs.append(nx.ladder_graph(i))
+        graphs.append(nx.wheel_graph(i))
+    indices = ["path", "cycle", "clique", "grid", "star", "ladder", "wheel"]
+    strs = [""] * len(graphs)
+    for i in range(len(graphs)):
+        print(indices[i%len(indices)], portrait_divergence(G,graphs[i]))
+
+def vol(month,year):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    minas = months.index(month)
+    #G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    #edges=list(G.edges())
+    #count=0
+    #for edge in edges:
+    #    count+=G.get_edge_data(edge[0],edge[1])["weight"]
+    G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    all = list(G.edges)
+    weightall = 0
+    for edge in all:
+        weightall += G.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightall",format(weightall, ","))
+    G1 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated")
+    reg = list(G1.edges)
+    weightreg = 0
+    for edge in reg:
+        weightreg += G1.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightreg", format(weightreg, ","))
+    G2 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "governmental")
+    gov = list(G2.edges)
+    weightgov = 0
+    for edge in gov:
+        weightgov += G2.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightgov", format(weightgov, ","))
+    G3 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "financial")
+    fin = list(G3.edges)
+    weightfin = 0
+    for edge in fin:
+        weightfin += G3.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightfin", format(weightfin, ","))
+    G4 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated,financial")
+    regfin = list(filter(lambda x: x not in reg+fin, list(G4.edges)))
+    weightregfin = 0
+    for edge in regfin:
+        weightregfin += G4.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightregfin", format(weightregfin, ","))
+    G5 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated,governmental")
+    reggov = list(filter(lambda x: x not in reg + gov, list(G5.edges)))
+    weightreggov = 0
+    for edge in reggov:
+        weightreggov += G5.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightreggov", format(weightreggov, ","))
+    G6 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "governmental,financial")
+    fingov = list(filter(lambda x: x not in reg + gov, list(G6.edges)))
+    weightfingov = 0
+    for edge in fingov:
+        weightfingov += G6.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightfingov", format(weightfingov, ","))
 #start=time.time()
 #get_trans("29/6/2014","30/6/2014")
 #get_unique_nodes("29/6/2014","30/6/2014")
@@ -1283,5 +1287,10 @@ ignite()
 #toleda("November",2011)
 #sotiris()
 #manytests2()
-tempgraph()
+#tempgraph()
 #doit()
+#reggovfin("January",2011)
+#reggovfin("February",2011)
+#reggovfin("March",2011)
+#trials("June",2011)
+vol("June",2011)
