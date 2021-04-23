@@ -22,12 +22,10 @@ import scipy.stats as stats
 import netrd
 #from pyensae.languages import r2python
 from matplotlib.backends.backend_pdf import PdfPages
-import deepgraph as dg
 import sys
 from portrait_divergence import portrait_divergence,portrait_divergence_weighted
 from pyvis.network import Network
 from IPython.core.display import display, HTML
-from drawgraph import draw_graph3
 import xlrd
 import os
 import csv
@@ -221,15 +219,15 @@ def dirtydate(date):
     return f"""{date[0]}/{date[1]}/{date[2]}"""
 
 def nullstuff(fromdate,todate):#give % of null-including transactions
-    sql = f"""select transferringaccountholder, acquiringaccountholder, nbofunits, transactiontype
-            from transactions_new where transactiondate 
+    sql = f"""select TransferringAccountHolder, AcquiringAccountHolder, NbOfUnits, TransactionType
+            from Transactions_New where TransactionDate 
             between '{fromdate}' and '{todate}'"""
     cursor.execute(sql)
     all = cursor.fetchall()
-    sql = f"""select transferringaccountholder, acquiringaccountholder, nbofunits, transactiontype
-            from transactions_new
-            where ((transferringaccountholder is NULL) or (acquiringaccountholder is NULL))
-            and transactiondate between '{fromdate}' and '{todate}'"""
+    sql = f"""select TransferringAccountHolder, AcquiringAccountHolder, NbOfUnits, TransactionType
+            from Transactions_New
+            where ((TransferringAccountHolder is NULL) or (AcquiringAccountHolder is NULL))
+            and TransactionDate between '{fromdate}' and '{todate}'"""
     cursor.execute(sql)
     nulls = cursor.fetchall()
     return(len(nulls)*100/len(all))
@@ -262,18 +260,18 @@ def get_unique_nodes(fromdate,todate,category="None"):#return list of unique acc
     #print("Addition","l"+addition+"l")
     fromd = cleandate(fromdate)
     tod = cleandate(todate)
-    sql = f"""select distinct tran.acquiringaccountholder, class.category, class.sector, acc.country, class.registry
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-    where tran.acquiringaccountholder = acc.holdername
-    and acc.rawcode = class.holder{addition}
-    and tran.transactiondate 
+    sql = f"""select distinct tran.AcquiringAccountHolder, class.category, class.sector, acc.country, class.registry
+    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class
+    where tran.AcquiringAccountHolder = acc.holderName
+    and acc.rawCode = class.holder{addition}
+    and tran.TransactionDate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
     #print("stage1.1")
-    sql2 = f"""select distinct tran.transferringaccountholder, class.category, class.sector, acc.country, class.registry
-    from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-    where tran.transferringaccountholder = acc.holdername
-    and acc.rawcode = class.holder{addition}
-    and tran.transactiondate 
+    sql2 = f"""select distinct tran.TransferringAccountHolder, class.category, class.sector, acc.country, class.registry
+    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class
+    where tran.TransferringAccountHolder = acc.holderName
+    and acc.rawCode = class.holder{addition}
+    and tran.TransactionDate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
     #print("stage1.2")
     #print(sql)
@@ -298,23 +296,23 @@ def getnodesalt(trans): #get nodes from transactions as list ["node1","node2"...
 
 def get_trans(fromdate,todate,restriction="None"): #συναλλαγές μεταξύ δυο ημερομηνιών
     if restriction!="None":
-        addition= f"and nbofunits>{restriction}"
+        addition= f"and NbOfUnits>{restriction}"
     else: addition=""
     fromd=cleandate(fromdate)
     tod=cleandate(todate)
     key = 2 #1 for everything in, 2 for excluding NULL,
     if key ==1 :
-        sql = f"""select transferringaccountholder, acquiringaccountholder, nbofunits, transactiontype
-        from transactions_new where
-        transactiondate 
+        sql = f"""select TransferringAccountHolder, AcquiringAccountHolder, NbOfUnits, TransactionType
+        from Transactions_New where
+        TransactionDate 
         between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'
         {addition}"""
     #If we want to exclude NULL appearances do the following
     elif key==2 :
-        sql = f"""select transferringaccountholder, acquiringaccountholder, nbofunits, transactiontype
-        from transactions_new
-        where ((transferringaccountholder is not NULL) and (acquiringaccountholder is not NULL))
-        and transactiondate between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'
+        sql = f"""select TransferringAccountHolder, AcquiringAccountHolder, NbOfUnits, TransactionType
+        from Transactions_New
+        where ((TransferringAccountHolder is not NULL) and (AcquiringAccountHolder is not NULL))
+        and TransactionDate between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'
         {addition}"""
     cursor.execute(sql)
     tran=cursor.fetchall()
@@ -325,15 +323,15 @@ def get_trans_country(fromdate,todate):
     tod = cleandate(todate)
     key = 2  # 1 for everything in, 2 for excluding NULL,
     if key == 1:
-        sql = f"""select TransferringRegistry,AcquiringRegistry, nbofunits, transactiontype
-            from transactions_new where transactiondate 
+        sql = f"""select TransferringRegistry,AcquiringRegistry, NbOfUnits, TransactionType
+            from Transactions_New where TransactionDate 
             between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
     # If we want to exclude NULL appearances do the following
     elif key == 2:
-        sql = f"""select TransferringRegistry,AcquiringRegistry, nbofunits, transactiontype
-            from transactions_new
-            where ((transferringaccountholder is not NULL) and (acquiringaccountholder is not NULL))
-            and transactiondate between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+        sql = f"""select TransferringRegistry,AcquiringRegistry, NbOfUnits, TransactionType
+            from Transactions_New
+            where ((TransferringAccountHolder is not NULL) and (AcquiringAccountHolder is not NULL))
+            and TransactionDate between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
     cursor.execute(sql)
     tran = cursor.fetchall()
     return tran
@@ -456,17 +454,17 @@ def nodeaggr(fromdate,todate,aggr):
         key =3
     elif aggr == "countrypollution":
         key=4
-    sql0=f"""select tran.transferringaccountholder, class.category, class.sector,acc.country, class.registry
-        from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-        where tran.transferringaccountholder = acc.holdername
-        and acc.rawcode = class.holder
-        and tran.transactiondate 
+    sql0=f"""select tran.TransferringAccountHolder, class.category, class.sector,acc.country, class.registry
+        from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class
+        where tran.TransferringAccountHolder = acc.holderName
+        and acc.rawCode = class.holder
+        and tran.TransactionDate 
         between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
-    sql1 = f"""select tran.acquiringaccountholder, class.category, class.sector,acc.country, class.registry
-       from transactions_new as tran, eutl_accountholders as acc,eutl_accholderclassification as class
-       where tran.acquiringaccountholder = acc.holdername
-       and acc.rawcode = class.holder
-       and tran.transactiondate 
+    sql1 = f"""select tran.AcquiringAccountHolder, class.category, class.sector,acc.country, class.registry
+       from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class
+       where tran.AcquiringAccountHolder = acc.holderName
+       and acc.rawCode = class.holder
+       and tran.TransactionDate 
        between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
     cursor.execute(sql1)
     acq = cursor.fetchall()
