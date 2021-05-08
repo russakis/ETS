@@ -11,6 +11,7 @@ from main import ignite
 import collections
 import seaborn as sns #για ομορφιά
 from networkx.algorithms import community
+from networkx.algorithms.community import greedy_modularity_communities
 import time
 #import pygraphviz as pgv
 from plug import newplot
@@ -29,7 +30,7 @@ from IPython.core.display import display, HTML
 import xlrd
 import os
 import csv
-
+from itertools import combinations
 
 
 
@@ -1158,6 +1159,35 @@ def reggovfin(month,year):
     fingov = len(list(G6.edges)) - len(list(G2.edges)) - len(list(G3.edges))
     print("between governmental and financial", fingov,f'{fingov/all*100:.3g}%')
 
+def reggovfinfile(month,year,f):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    minas = months.index(month)
+    G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    print("all edges",len(list(G.edges)),file=f)
+    all=len(list(G.edges))
+    G1 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year),"regulated")
+    regedges = len(list(G1.edges))
+    print("between regulated",regedges,f'{regedges/all*100:.3g}%',file=f)
+    G2 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "governmental")
+    govedges = len(list(G2.edges))
+    print("between governmental",govedges,f'{govedges/all*100:.3g}%',file=f)
+    G3 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "financial")
+    finedges= len(list(G3.edges))
+    print("between financial",finedges,f'{finedges/all*100:.3g}%',file=f)
+    G4 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated,financial")
+    regfin =len(list(G4.edges))- len(list(G1.edges))-len(list(G3.edges))
+    print("between regulated and financial",regfin,f'{regfin/all*100:.3g}%',file=f)
+    G5 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated,governmental")
+    reggov = len(list(G5.edges)) - len(list(G1.edges)) - len(list(G2.edges))
+    print("between regulated and governmental", reggov,f'{reggov/all*100:.3g}%',file=f)
+    G6 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "governmental,financial")
+    fingov = len(list(G6.edges)) - len(list(G2.edges)) - len(list(G3.edges))
+    print("between governmental and financial", fingov,f'{fingov/all*100:.3g}%',file=f)
+
 def trials(month,year):
     months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
               "November", "December"]
@@ -1194,7 +1224,7 @@ def vol(month,year):
     #for edge in edges:
     #    count+=G.get_edge_data(edge[0],edge[1])["weight"]
     G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
-    all = list(G.edges)
+    all = list(G.edges())
     weightall = 0
     for edge in all:
         weightall += G.get_edge_data(edge[0], edge[1])["weight"]
@@ -1235,7 +1265,176 @@ def vol(month,year):
     for edge in fingov:
         weightfingov += G6.get_edge_data(edge[0], edge[1])["weight"]
     print("weightfingov", format(weightfingov, ","))
-#start=time.time()
+
+def vol2(month,year,f):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    minas = months.index(month)
+    #G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    #edges=list(G.edges())
+    #count=0
+    #for edge in edges:
+    #    count+=G.get_edge_data(edge[0],edge[1])["weight"]
+    G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    all = list(G.edges())
+    weightall = 0
+    for edge in all:
+        weightall += G.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightall",format(weightall, ","),file=f)
+    G1 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated")
+    reg = list(G1.edges)
+    weightreg = 0
+    for edge in reg:
+        weightreg += G1.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightreg", format(weightreg, ","),file=f)
+    G2 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "governmental")
+    gov = list(G2.edges)
+    weightgov = 0
+    for edge in gov:
+        weightgov += G2.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightgov", format(weightgov, ","),file=f)
+    G3 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "financial")
+    fin = list(G3.edges)
+    weightfin = 0
+    for edge in fin:
+        weightfin += G3.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightfin", format(weightfin, ","),file=f)
+    G4 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated,financial")
+    regfin = list(filter(lambda x: x not in reg+fin, list(G4.edges)))
+    weightregfin = 0
+    for edge in regfin:
+        weightregfin += G4.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightregfin", format(weightregfin, ","),file=f)
+    G5 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "regulated,governmental")
+    reggov = list(filter(lambda x: x not in reg + gov, list(G5.edges)))
+    weightreggov = 0
+    for edge in reggov:
+        weightreggov += G5.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightreggov", format(weightreggov, ","),file=f)
+    G6 = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), "governmental,financial")
+    fingov = list(filter(lambda x: x not in reg + gov, list(G6.edges)))
+    weightfingov = 0
+    for edge in fingov:
+        weightfingov += G6.get_edge_data(edge[0], edge[1])["weight"]
+    print("weightfingov", format(weightfingov, ","),file=f)
+
+def nightly():
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    f= open("nightlyfiles.txt","w+")
+    for i in range(2006,2016):
+        for month in months:
+            print(month,i,file=f)
+            reggovfinfile(month,i,f)
+            print("weights",file=f)
+            vol2(month,i,f)
+    f.close()
+
+def runtrials():
+    #G=controlroom("1/1/2011","31/1/2011")
+    G=nx.cycle_graph(20)
+    G1=nx.path_graph(20)
+    G2=nx.ladder_graph(20)
+    nx.draw(G2)
+    nt = Network(notebook=True)
+    nt.from_nx(G2)
+    # nt.show_buttons(filter=['physics'])
+    nt.show_buttons()
+    nt.show('laddergraph.html')
+    print(portrait_divergence(G,G1))
+
+def whatamidoing():
+    G=controlroom("1/9/2013","30/9/2013")
+    G1=controlroom("1/9/2012","30/9/2012")
+    while len(list(G.edges))<len(list(G1.edges)):
+        randedge = random.choice(list(G1.edges))
+        #print("compar edges",len(list(G.edges)),len(list(G1.edges)))
+        G1.remove_edge(randedge[0],randedge[1])
+    print("compar edges",len(list(G.edges)),len(list(G1.edges)))
+    print(portrait_divergence(G,G1))
+
+def centric():
+    G = controlroom("1/1/05", "31/12/05")
+    gedges = list(G.edges)
+    gnodes = list(G.nodes)
+    print("edges",len(gedges),"nodes",len(gnodes))
+    prob1=len(gnodes)/(len(gnodes)+len(gnodes)/2)
+    prob2=len(gnodes)/(2*(len(gnodes)+len(gnodes)/2))
+
+    network=nx.Graph()
+    network.add_nodes_from(gnodes)
+    potedges = list(combinations(network.nodes, 2))
+    timestamp1=time.time()-start
+    print("timestamp1",timestamp1)
+    for potential in potedges:
+        rand = random.uniform(0,1)
+        if potential in gedges:
+            if rand > prob1:
+                network.add_edge(potential[0],potential[1])
+        else:
+            if rand > prob2:
+                network.add_edge(potential[0],potential[1])
+    #       newplot(network)
+    nt = Network(notebook=True)
+    nt.from_nx(network)
+    # nt.show_buttons(filter=['physics'])
+    nt.show_buttons()
+    nt.show('centrictest.html')
+    endtime=time.time()-timestamp1
+    print("ending",endtime)
+    print(prob1,prob2)
+
+
+def centricbetter():
+    G = controlroom("1/1/05", "31/12/05")
+    print("density baby",nx.density(G))
+    gedges = list(G.edges)
+    gnodes = list(G.nodes)
+    print("edges", len(gedges), "nodes", len(gnodes))
+    prob1 = len(gnodes) / (len(gnodes) + len(gnodes) / 2)
+    prob2 = len(gnodes) / (2 * (len(gnodes) + len(gnodes) / 2))
+    timestamp1= time.time()-start
+    print("timestamp1",timestamp1)
+    network = nx.Graph()
+    network.add_nodes_from(gnodes)
+    potedges = list(combinations(network.nodes, 2))
+    print(len(potedges))
+    timestamp2= time.time() - timestamp1
+    print("timestamp2",timestamp2)
+    #nonedges=[x for x in potedges if x not in gedges]
+    nonedges=set(potedges) - set(gedges)
+    print(len(gedges),len(nonedges),len(potedges))
+    print("finishing time", time.time() - timestamp2)
+    counter=0
+    print("HOW DID I GET HERE")
+    for i in gedges:
+        counter+=1
+        #print("edges",counter)
+        rand = random.uniform(0,1)
+        if rand > prob1:
+            network.add_edge(i[0], i[1])
+    for i in nonedges:
+        counter += 1
+        #print("nonedges", counter)
+        rand = random.uniform(0,1)
+        if rand > prob2:
+            network.add_edge(i[0], i[1])
+    """nt = Network(notebook=True)
+    print("are we here")
+    nt.from_nx(network)
+    print("or are we here")
+    # nt.show_buttons(filter=['physics'])
+    nt.show_buttons()
+    print("the fuck is happenin")
+    nt.show('centrictest.html')"""
+    #print("difference",portrait_divergence(network,G))
+    endtime = time.time() - timestamp2
+    print("ending", endtime)
+
+start=time.time()
 #get_trans("29/6/2014","30/6/2014")
 #get_unique_nodes("29/6/2014","30/6/2014")
 #plotting("29/6/2014","30/7/2014")
@@ -1291,4 +1490,9 @@ def vol(month,year):
 #reggovfin("February",2011)
 #reggovfin("March",2011)
 #trials("June",2011)
-vol("June",2011)
+#vol("June",2011)
+#nightly()
+#runtrials()
+#whatamidoing()
+#centricbetter()
+

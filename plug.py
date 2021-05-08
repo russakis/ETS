@@ -8,8 +8,8 @@ def newplot(G):
     units=[]
     print("STARTING NOW")
     for edge in G.edges():
-        print(edge)
-        print(G.nodes[edge[0]],G.nodes[edge[1]])
+        #print(edge)
+        #print(G.nodes[edge[0]],G.nodes[edge[1]])
         x0, y0 = G.nodes[edge[0]]['pos']
         x1, y1 = G.nodes[edge[1]]['pos']
         edge_x.append(x0)
