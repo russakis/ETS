@@ -31,7 +31,8 @@ import xlrd
 import os
 import csv
 from itertools import combinations
-
+import pajek_tools as pajek
+import mpmath
 
 
 def freedman_diaconis(data, returnas="width"):
@@ -97,12 +98,14 @@ def newplotting(fromdate,todate,category="None",restriction="None",aggregation="
     #print("stage2")
     #nodes=cleannodes(nodes,trans)#αφαιρεί κόμβους που δεν έχουν ακμή(χρειάζομαι connected graph)
     nodesup=[(i[0].upper(),i[1],i[2],i[3],i[4]) for i in nodes]#τα κάνω κεφαλαία
+    print("initial",len(nodesup[0]))
     transup=[(i[0].upper(),i[1].upper(),i[2],i[3]) for i in trans]#τα κάνω κεφαλαία
     #print("stage3")
     transup = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
     #trans=thecleanest(trans,nodes)
     transup = cleantransloop(transup)
     nodesup = cleannodes(nodesup,transup) #στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
+    print("later", len(nodesup[0]))
     #print("these are trans homie:",len(transup),"these dem nodes",len(nodesup))
     #testingfun(nodes,trans)
     #print(nodesup)
@@ -261,16 +264,18 @@ def get_unique_nodes(fromdate,todate,category="None"):#return list of unique acc
     #print("Addition","l"+addition+"l")
     fromd = cleandate(fromdate)
     tod = cleandate(todate)
-    sql = f"""select distinct tran.AcquiringAccountHolder, class.category, class.sector, acc.country, class.registry
-    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class
+    sql = f"""select distinct tran.AcquiringAccountHolder, class.category, class.sector, acc.country, class.registry,size.transNumSize
+    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class,EUTL_AccHolderTransactingSize as size
     where tran.AcquiringAccountHolder = acc.holderName
+    and acc.rawCode = size.holder
     and acc.rawCode = class.holder{addition}
     and tran.TransactionDate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
     #print("stage1.1")
-    sql2 = f"""select distinct tran.TransferringAccountHolder, class.category, class.sector, acc.country, class.registry
-    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class
+    sql2 = f"""select distinct tran.TransferringAccountHolder, class.category, class.sector, acc.country, class.registry, size.transNumSize
+    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class,EUTL_AccHolderTransactingSize as size
     where tran.TransferringAccountHolder = acc.holderName
+    and acc.rawCode = size.holder
     and acc.rawCode = class.holder{addition}
     and tran.TransactionDate 
     between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
@@ -495,8 +500,8 @@ def degreedist(G):
     ax.set_xticklabels(deg)
     plt.show()
 
-def getstats(fromdate,todate):
-    G = controlroom(fromdate,todate)
+def getstats(fromdate,todate,category="None"):
+    G = controlroom(fromdate,todate,category=category)
     H = G.to_undirected()
     #newplot(G)
     #print("clustering UD",nx.clustering(G))
@@ -523,7 +528,7 @@ def getstats(fromdate,todate):
     #print(smallest)
     #print(G.edges("TEC SVISHTOV AD"))
     #print(G.edges("LECHWERKE AG"))
-    #rint(list(nx.isolates(G)))
+    #print(list(nx.isolates(G)))
     #newplot(smallest)
     #int(nx.is_connected(H))
     #int("diameter",nx.diameter(H))
@@ -717,7 +722,7 @@ def mult(fromdate,todate):
         F[2] = str(int(F[2]) + 1)
         T[2] = str(int(T[2]) + 1)
 
-def massstats(fromdate,todate):
+def massstats(fromdate,todate,category="None"):
     months=["January","February","March","April","May","June","July","August","September","October","November","December"]
     F=T=["1","1","2005"]
     dates=[("1/1/","31/1/"),("1/2/","28/2/"),("1/3/","31/3/"),("1/4/","30/4/"),("1/5/","31/5/"),("1/6/","30/6/"),("1/7/","31/7/"),("1/8/","31/8/")
@@ -727,7 +732,7 @@ def massstats(fromdate,todate):
         print(year,file=f)
         for j in range(12):
             print(months[j],file=f)
-            getstats(dates[j][0]+str(year),dates[j][1]+str(year))
+            getstats(dates[j][0]+str(year),dates[j][1]+str(year),category=category)
 
 def edli(fromdate,todate):
     months=["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -790,6 +795,59 @@ def newcomp(fromdate1,todate1,fromdate2,todate2):
     print("samies", nottt)
     print("deltacon", d, d1)
 
+
+def countdiffrences():
+    count = [0, 0, 0, 0, 0, 0, 0]
+    countall = 0
+    for row in df.itertuples():
+        for i in row:
+            if type(i) == str or type(i) == int:
+                continue
+            countall += 1
+            if i <= 0.4:
+                count[0] += 1
+            elif i <= 0.5:
+                count[1] += 1
+            elif i <= 0.6:
+                count[2] += 1
+            elif i <= 0.7:
+                count[3] += 1
+            elif i <= 0.8:
+                count[4] += 1
+            elif i <= 0.9:
+                count[5] += 1
+            else:
+                count[6] += 1
+
+    for i in range(7):
+        print(f"count{i + 4}0", count[i] * 100 / countall)
+    df = pd.read_csv("monthscomparison.csv", sep=',')
+    print(len(df))
+    count = [0, 0, 0, 0, 0, 0, 0]
+    countall = 0
+    for row in df.itertuples():
+        for i in row:
+            if type(i) == str or type(i) == int:
+                continue
+            countall += 1
+            if i <= 0.4:
+                count[0] += 1
+            elif i <= 0.5:
+                count[1] += 1
+            elif i <= 0.6:
+                count[2] += 1
+            elif i <= 0.7:
+                count[3] += 1
+            elif i <= 0.8:
+                count[4] += 1
+            elif i <= 0.9:
+                count[5] += 1
+            else:
+                count[6] += 1
+
+    for i in range(7):
+        print(f"count{i + 4}0", count[i] * 100 / countall)
+        
 def testin():
     G1=nx.Graph()
     G2 = nx.Graph()
@@ -1434,6 +1492,241 @@ def centricbetter():
     endtime = time.time() - timestamp2
     print("ending", endtime)
 
+def getshitfast(fromdate, todate, category="None", restriction="None", aggregation="None"):
+    G = nx.DiGraph()
+    # print("stage1")
+    trans = get_trans(fromdate, todate, restriction)
+    # print("trans",trans)
+    nodes = get_unique_nodes(fromdate, todate, category)
+    # print("stage2")
+    # nodes=cleannodes(nodes,trans)#αφαιρεί κόμβους που δεν έχουν ακμή(χρειάζομαι connected graph)
+    nodesup = [(i[0].upper(), i[1], i[2], i[3], i[4]) for i in nodes]  # τα κάνω κεφαλαία
+    transup = [(i[0].upper(), i[1].upper(), i[2], i[3]) for i in trans]  # τα κάνω κεφαλαία
+    # print("stage3")
+    transup = cleantrans(transup, nodesup)  # backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
+    # trans=thecleanest(trans,nodes)
+    transup = cleantransloop(transup)
+    nodesup = cleannodes(nodesup, transup)  # στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
+    # print("these are trans homie:",len(transup),"these dem nodes",len(nodesup))
+    # testingfun(nodes,trans)
+    # print(nodesup)
+    # trans = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο trans
+    print("nodesup",len(nodesup))
+    print("transup",len(transup))
+
+    #G = nodify(nodesup, G)  # φέρνω τους κόμβους σε καταλλληλη μορφή για το γράφημα
+    #G = edgify(transup, G)  # φέρνω τις ακμές σε κατάλληλη μορφή για το γράφημα
+    # newplot(G)#κάλεσμα συνάρτησης από το plug.py για το σχεδιασμό
+    # nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
+    # plt.show()
+    # dg.plot_2d()
+    return G
+
+def newfaststats(fromdate, todate,
+                     category="None"):  # return list of unique account holders [('node1,'category',
+    if category == "None":
+        addition = ""
+    elif "," not in category:
+        addition = f"\nand class.category = '{category}'"
+    elif len(category.split(",")) == 2:
+        things = category.split(",")
+        addition = f"\nand (class.category = '{things[0]}' or class.category = '{things[1]}')"
+    else:
+        things = category.split(",")
+        addition = f"\nand (class.category = '{things[0]}' or class.category = '{things[1]} or or class.category = '{things[2]}')"
+
+    # print("Addition","l"+addition+"l")
+    fromd = cleandate(fromdate)
+    tod = cleandate(todate)
+    sql = f"""select distinct tran.AcquiringAccountHolder, class.category, class.sector, acc.country, class.registry,size.avgTransNum
+    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class, EUTL_AccHolderTransactingSize as size
+    where tran.AcquiringAccountHolder = acc.holderName
+    and acc.rawCode = size.holder
+    and acc.rawCode = class.holder{addition}
+    and tran.TransactionDate 
+    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+    # print("stage1.1")
+    sql2 = f"""select distinct tran.TransferringAccountHolder, class.category, class.sector, acc.country, class.registry,size.avgTransNum
+    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class, EUTL_AccHolderTransactingSize as size
+    where tran.TransferringAccountHolder = acc.holderName
+    and acc.rawCode = size.holder
+    and acc.rawCode = class.holder{addition}
+    and tran.TransactionDate 
+    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+    # print("stage1.2")
+    # print(sql)
+    cursor.execute(sql)
+    acq = cursor.fetchall()
+    # print("stage1.3")
+    cursor.execute(sql2)
+    tran = cursor.fetchall()
+    # print("stage1.4")
+    all = get_unique(acq + tran)
+    # print("stage1.5")
+    # print("nodes",all)
+    return all
+
+def damnindians(month,year,category="None"):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    f=open(f"{month}{year}.paj",'w+')
+    g=open(f"{month}{year}sup.txt",'w+')
+    minas = months.index(month)
+    G,finalnodes = slovenian(month,year,category=category)
+    #G=controlroom("1/1/2011","5/1/2011")
+    nodes=list(G.nodes())
+    edges=list(G.edges())
+    #print(f"""*Network {month}{year}""",file=f)
+    print("*Vertices",len(nodes),file=f)
+    edgesindex = []
+    for edge in edges:
+        edgesindex.append((nodes.index(edge[0])+1, nodes.index(edge[1])+1))#τα αυξάνω κατά 1 γιατί θα τυπώσω τους κόμβους με +1 μετάθεση
+    nodesindex = [nodes.index(node) for node in nodes]
+    for i in range(len(nodesindex)):
+        print(nodesindex[i]+1,"\""+nodes[i]+"\"",sep=" ",file=f)
+
+        #print(nodesindex[i]+1, sep="\t", file=f)
+    #print("*Arcs",file=f)
+    print("*Edges",file=f)
+    for j in range(len(edgesindex)):
+        print(edgesindex[j][0],edgesindex[j][1],sep=" ",file = f)
+    print(finalnodes)
+    for node in finalnodes:
+        print(node[5],file=g)
+    g.close()
+    f.close()
+
+
+def slovenian(month,year,category="None"):
+    G=nx.DiGraph()
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    minas = months.index(month)
+    nodes=newfaststats(dates[minas][0] + str(year), dates[minas][1] + str(year), category=category)
+
+    #print(nodes)
+    trans = get_trans(dates[minas][0] + str(year), dates[minas][1] + str(year), restriction="None")
+    nodesup = [(i[0].upper(), i[1], i[2], i[3], i[4],i[5]) for i in nodes]  # τα κάνω κεφαλαία
+    transup = [(i[0].upper(), i[1].upper(), i[2], i[3]) for i in trans]  # τα κάνω κεφαλαία
+    # print("stage3")
+    transup = cleantrans(transup, nodesup)  # backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
+    # trans=thecleanest(trans,nodes)
+    transup = cleantransloop(transup)
+    nodesup = cleannodes(nodesup, transup)  # στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
+    #print("nodes after cleaning",nodes)
+    G = nodify(nodesup, G)  # φέρνω τους κόμβους σε καταλλληλη μορφή για το γράφημα
+    G = edgify(transup, G)  # φέρνω τις ακμές σε κατάλληλη μορφή για το γράφημα
+    # newplot(G)#κάλεσμα συνάρτησης από το plug.py για το σχεδιασμό
+    # nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
+    # plt.show()
+    # dg.plot_2d()
+    #print(nodesup,list(G.nodes()))
+    return (G,nodesup)
+    #G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), category=category)
+
+def somepypistuff(month,year,category="None"):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    f = open(f"""{month}{year}.paj""", 'w+')
+    minas = months.index(month)
+    G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), category=category)
+    edges= list(G.edges())
+    nodes= list(G.nodes())
+    df= pd.DataFrame
+    l=[]
+    for edge in edges:
+        l.append([edge[0],edge[1]])
+    #data=np.array(l)
+    df =pd.DataFrame(l,columns=["transfering","acquiring"])
+    writer = pajek.PajekWriter(df,directed=False,citing_colname="transfering",cited_colname="acquiring")
+    writer.write("output.net")
+
+def altern(month,year,category="None"):
+    G,finalnodes = slovenian(month,year,category=category)
+    nx.write_pajek(G, f"nogovundir/{month}{year}.net")
+    g=open(f"nogovundir/{month}{year}sup.txt",'w+')
+    stri=""
+    #for node in finalnodes:
+    #    stri=str(G.degree[node[0]]) +" "
+        #print(G.degree[node[0]],file=g)
+    for node in finalnodes:
+        print(node[5],file=g)
+    print(stri,file=g)
+    g.close()
+
+def allmonthspaj():
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    for year in range(2005,2016):
+        for month in months:
+            altern(month,year,"regulated,financial")
+def help():
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    res=""
+    for year in range(2005, 2016):
+        for month in months:
+            res+="\""+month+str(year)+"\""+","
+    print(res)
+
+
+def genesis():
+    edgescov=-7.697990
+    sizecov=2.597914*(10**(-6))
+    #print(sizecov)
+    #sizecov=2.349*(math.exp(-6))
+    #print(edgescov,sizecov)
+    originalgraph,nodes=slovenian("August",2013)
+    probs=[[None]*len(nodes)]*len(nodes)
+    #print(len(probs),len(probs[1]))
+    nodenames=[]
+    sizes=[]
+    for node in nodes:
+        nodenames.append(node[0])
+        sizes.append(node[5])
+    #print(nodenames)
+    #print(sizes)
+    for i in range(len(nodenames)):
+        for j in range(i+1):
+            logit=edgescov+sizecov*(sizes[i]+sizes[j])
+            probs[i][j]=((math.e)**logit)/(1+(math.e)**(logit))
+    G=nx.DiGraph()
+    for i in range(len(nodenames)):
+        for j in range(i+1):
+            p=np.random.uniform(0,1)
+            if p<= probs[i][j]:
+                G.add_edge(nodenames[i],nodenames[j])
+    return (G,originalgraph)
+
+def readfromstuff(filename):
+    f=open(f"{filename}"+".net",'r')
+    nodesize=(f.readline()).split(" ")[1]
+    nodes=[]
+    for i in range(int(nodesize)):
+        temp=f.readline().split("\"")[1]
+        nodes.append(temp)
+    return nodes
+
+
+def artcomp():
+    artificial,_=genesis()
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    for year in range(2006,2016):
+        for month in months:
+            G,_=slovenian(month,year,category="regulated,financial")
+            print(month,year,portrait_divergence(G,artificial))
+
+
 start=time.time()
 #get_trans("29/6/2014","30/6/2014")
 #get_unique_nodes("29/6/2014","30/6/2014")
@@ -1448,7 +1741,9 @@ start=time.time()
 #newplotting("5/5/2015","7/5/2015")
 #countryaggr("29/6/2014","1/7/2014")
 #newplotting("29/6/2014","30/6/2014")
-#getstats("1/4/2014", "1/5/2014")
+#f=open("temporary.txt","w+")
+#massstats("1/1/2014", "1/2/2014","regulated,financial")
+#f.close()
 #getstats("1/3/2012","1/4/2012")
 #controlroom("1/1/2012","1/2/2012")
 #compar("1/2/2012","1/3/2012","1/2/2013","1/3/2013")
@@ -1495,4 +1790,40 @@ start=time.time()
 #runtrials()
 #whatamidoing()
 #centricbetter()
-
+#damnindians("May","2013")
+"""list1=newfaststats("1/1/2005","31/12/2015")
+print(len(list1))
+list2=newfaststats("1/1/2005","31/12/2015","regulated")
+print(len(list2))
+list3=newfaststats("1/1/2005","31/12/2015","governmental")
+print(len(list3))
+list4=newfaststats("1/1/2005","31/12/2015","financial")
+print(len(list4))"""
+#damnindians("August",2012)
+#G=controlroom("1/12/2011","31/12/2011")
+#nx.write_pajek(G,"madness.net")
+#print(help(pajek_tools.PajekWriter))
+#damnindians("January",2011)
+#altern("July",2012)
+#allmonthspaj()
+#help()
+#artificial,originalgraph= genesis()
+#G,_=slovenian("August",2015)
+#central = nx.betweenness_centrality(G)
+#central2=dict(sorted(central.items(),key= lambda x:x[1]))
+#print(central2)
+#G,originalgraph= genesis()
+#originalgraph,_=slovenian("August",2012)
+#print(portrait_divergence(G,artificial))
+#readfromstuff("directedsizenumber/August2013")
+#altern("November",2015)
+#artcomp()
+df=pd.read_csv("directedmonthscomparison.csv",sep=';')
+print(len(df))
+#for column_name,item in df.iteritems():
+#    print(column_name)
+#    print(item)
+#    if item == 0.8448:
+#        count=1
+#    else:
+#        count=0
