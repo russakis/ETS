@@ -33,7 +33,14 @@ import csv
 from itertools import combinations
 import pajek_tools as pajek
 import mpmath
+import igraph as ig
 
+
+def onefun(TF):
+    if TF==True:
+        return 1
+    else:
+        return 0
 
 def freedman_diaconis(data, returnas="width"):
     """
@@ -90,7 +97,7 @@ def controlroom(fromdate,todate,category="None",restriction="None",*args):
 
 #η γενική συνάρτηση στην οποία συμβαίνουν τα πάντα
 def newplotting(fromdate,todate,category="None",restriction="None",aggregation="None"):
-    G = nx.DiGraph()
+    G = nx.Graph()
     #print("stage1")
     trans = get_trans(fromdate, todate, restriction)
     #print("trans",trans)
@@ -98,14 +105,12 @@ def newplotting(fromdate,todate,category="None",restriction="None",aggregation="
     #print("stage2")
     #nodes=cleannodes(nodes,trans)#αφαιρεί κόμβους που δεν έχουν ακμή(χρειάζομαι connected graph)
     nodesup=[(i[0].upper(),i[1],i[2],i[3],i[4]) for i in nodes]#τα κάνω κεφαλαία
-    print("initial",len(nodesup[0]))
     transup=[(i[0].upper(),i[1].upper(),i[2],i[3]) for i in trans]#τα κάνω κεφαλαία
     #print("stage3")
     transup = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
     #trans=thecleanest(trans,nodes)
     transup = cleantransloop(transup)
     nodesup = cleannodes(nodesup,transup) #στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
-    print("later", len(nodesup[0]))
     #print("these are trans homie:",len(transup),"these dem nodes",len(nodesup))
     #testingfun(nodes,trans)
     #print(nodesup)
@@ -347,57 +352,6 @@ def graphify(dic):
     G = nx.from_pandas_edgelist(df, 'from', 'to', create_using=nx.DiGraph())
     nx.draw(G, with_labels=False, node_size=1500, alpha=0.3, arrows=True)
 
-
-def plotting(fromdate,todate):
-    dic={'from':[],'to':[]}
-    trans=get_trans(fromdate,todate)
-    #transdf=pd.DataFrame(trans,columns=['acq','tran','units','type'])
-    point01=time.time()
-    print("point01 ", point01-start)
-    #οι 2 παρακάτω γραμμές χρειάζονται για το degree distribution
-    #dicoutnodes=dicify(trans)
-    #dicinnodes=revdicify(trans)
-    point02=time.time()
-    print("point02",point02-point01)
-    get_unique_nodes(fromdate,todate)
-    nodes=getnodesalt(trans)
-    print(len(gov(fromdate,todate)))
-    #onlygov=cleantrans(trans,get_unique((fin(fromdate,todate)+reg(fromdate,todate))))
-    onlyfin=cleantrans(trans,get_unique((gov(fromdate,todate)+reg(fromdate,todate))))
-    #onlyreg=cleantrans(trans,get_unique((gov(fromdate,todate)+fin(fromdate,todate))))
-    #nogovtrans=cleantrans(trans,gov(fromdate,todate))
-    point03= time.time()
-    print("point03",point03-point02)
-    #nodes=get_unique_nodes(fromdate,todate)
-    for i in range(0,len(trans)):
-        dic['from'].append(trans[i][0])
-        dic['to'].append(trans[i][1])
-    df=pd.DataFrame(dic)
-    point04=time.time()
-    print("point04 ",point04-point03)
-    #G = nx.from_pandas_edgelist(df, 'from', 'to', create_using=nx.DiGraph())
-    #nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
-    #plt.show()
-    #degreedistr(dicoutnodes) #για κατανομή βαθμών κορυφών έσω
-    #degreedistr(dicinnodes) #για κατανομή βαθμών κορυφών έξω
-    mat=getmatrix(onlyfin,nodes)
-    simplematrix = getsimplematrix(mat)
-    point1= time.time()
-    print("point1 ",point1-point04)
-    G = nx.DiGraph(mat)
-    point2= time.time()
-    print("point2 ",point2-point1)
-    #density = nx.density(G)
-    #nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
-    nx.draw_kamada_kawai(G,alpha=0.2)
-    #newplot(G)
-    point3=time.time()
-    print("point3 ",point3-point2)
-    plt.show()
-    centr=nx.betweenness_centrality(G, k=None, normalized=True, weight=None, endpoints=False, seed=None)
-    pagerank=nx.pagerank(G,alpha=0.8)
-    #communities = community.greedy_modularity_communities(G)
-
 def getmatrix(trans,nodes):
     mat = np.random.randint(0, 1, size=(len(nodes), len(nodes)))
     cleannodes=nodes
@@ -442,11 +396,6 @@ def degreedistr(dic):
     #plt.hist(degrees)
     plt.show()
     #print(degrees)
-
-
-
-def getdensity():
-    "something"
 
 def nodeaggr(fromdate,todate,aggr):
     fromd = cleandate(fromdate)
@@ -750,10 +699,6 @@ def edli(fromdate,todate):
             nx.write_edgelist(G, f"{date}_directed.txt")
             nx.write_edgelist(H, f"{date}_undirected.txt")
 
-def bigbois():
-    "adsf"
-
-
 def newcomp(fromdate1,todate1,fromdate2,todate2):
     G1 = controlroom(fromdate1, todate1)
     G2 = controlroom(fromdate2, todate2)
@@ -797,6 +742,8 @@ def newcomp(fromdate1,todate1,fromdate2,todate2):
 
 
 def countdiffrences():
+    df = pd.read_csv("directedmonthscomparison.csv", sep=';')
+    print(len(df))
     count = [0, 0, 0, 0, 0, 0, 0]
     countall = 0
     for row in df.itertuples():
@@ -847,7 +794,7 @@ def countdiffrences():
 
     for i in range(7):
         print(f"count{i + 4}0", count[i] * 100 / countall)
-        
+
 def testin():
     G1=nx.Graph()
     G2 = nx.Graph()
@@ -1601,7 +1548,7 @@ def damnindians(month,year,category="None"):
 
 
 def slovenian(month,year,category="None"):
-    G=nx.DiGraph()
+    G=nx.Graph()
     months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
               "November", "December"]
     dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
@@ -1652,23 +1599,39 @@ def somepypistuff(month,year,category="None"):
 
 def altern(month,year,category="None"):
     G,finalnodes = slovenian(month,year,category=category)
-    nx.write_pajek(G, f"nogovundir/{month}{year}.net")
-    g=open(f"nogovundir/{month}{year}sup.txt",'w+')
+    nx.write_pajek(G, f"dir/{month}{year}.net")
+    g=open(f"dir/{month}{year}sup.txt",'w+')
     stri=""
     #for node in finalnodes:
     #    stri=str(G.degree[node[0]]) +" "
         #print(G.degree[node[0]],file=g)
     for node in finalnodes:
-        print(node[5],file=g)
-    print(stri,file=g)
+        print(node[5],G.degree(node[0]),node[3],node[1],file=g)
+    #print(stri,file=g)
     g.close()
+
+def custompaj(month,year,category="None"):
+    G, finalnodes = slovenian(month, year, category=category)
+    #G=getbigcomp(G)
+    nx.write_pajek(G, f"latenight.net")
+    g = open(f"latenightsup.txt", 'w+')
+    stri = ""
+    # for node in finalnodes:
+    #    stri=str(G.degree[node[0]]) +" "
+    # print(G.degree[node[0]],file=g)
+    for node in finalnodes:
+        print(node[5], G.degree(node[0]), node[3], node[1], file=g)
+    # print(stri,file=g)
+    g.close()
+
 
 def allmonthspaj():
     months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
               "November", "December"]
     for year in range(2005,2016):
         for month in months:
-            altern(month,year,"regulated,financial")
+            print(month,year)
+            altern(month,year)
 def help():
     months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
               "November", "December"]
@@ -1679,9 +1642,11 @@ def help():
     print(res)
 
 
-def genesis():
-    edgescov=-7.697990
-    sizecov=2.597914*(10**(-6))
+def genesis(edgecoeff,nodecoef=0,country=0):
+    edgescov=edgecoeff
+    sizecov=nodecoef
+    ethniccov=country
+    #sizecov=nodecoef*(10**(nodepower))
     #print(sizecov)
     #sizecov=2.349*(math.exp(-6))
     #print(edgescov,sizecov)
@@ -1695,11 +1660,17 @@ def genesis():
         sizes.append(node[5])
     #print(nodenames)
     #print(sizes)
-    for i in range(len(nodenames)):
-        for j in range(i+1):
-            logit=edgescov+sizecov*(sizes[i]+sizes[j])
-            probs[i][j]=((math.e)**logit)/(1+(math.e)**(logit))
-    G=nx.DiGraph()
+    if country==0:
+        for i in range(len(nodenames)):
+            for j in range(i+1):
+                logit=edgescov+sizecov*(sizes[i]+sizes[j])
+                probs[i][j]=((math.e)**logit)/(1+(math.e)**(logit))
+    else:
+        for i in range(len(nodenames)):
+            for j in range(i + 1):
+                logit = edgescov + ethniccov * onefun(nodes[i][3] == nodes[j][3])+sizecov*(sizes[i]+sizes[j])
+                probs[i][j] = ((math.e) ** logit) / (1 + (math.e) ** (logit))
+    G=nx.Graph()
     for i in range(len(nodenames)):
         for j in range(i+1):
             p=np.random.uniform(0,1)
@@ -1726,7 +1697,390 @@ def artcomp():
             G,_=slovenian(month,year,category="regulated,financial")
             print(month,year,portrait_divergence(G,artificial))
 
+def allnightbaby():
+    f=open("nogovdir.txt",'r')
+    g=open("guadalcanal.txt",'w+')
 
+    c=f.readline()
+    while(len(c)!=0):
+        c=c.split()
+        print(c)
+        oyvey=c[1].split('20')
+        oyvey=oyvey[0]
+        print(oyvey)
+        #oyvey=oyvey[:-1]=oyvey[-2:]
+        print(oyvey[:-1],oyvey[-2:])
+        l=f.readline()
+        print(c,file=g)
+        l=f.readline().split(' ')
+        l = list(filter(('').__ne__, l))
+        print(l)
+        c=f.readline()
+        artificial,_=genesis(float(l[0]),float(l[1]))
+        months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October","November", "December"]
+        for year in range(2006,2007):
+            for month in months:
+                newg,_=slovenian(month,year)
+                print(month,year,portrait_divergence(artificial,newg),file=g)
+    g.close()
+    f.close()
+
+
+def formstriangleundir(G,node):
+    edges=list(G.edges())
+    neighbors = [n for n in G.neighbors(node)]
+    triangles=0
+    for v in neighbors:
+        neighbors.remove(v)
+        for w in neighbors:
+            if (v,w) in edges:
+                triangles+=1
+    return triangles
+
+
+def quarters(quarter,year,category="None"):
+    G=nx.Graph()
+    thequarters=["Q1","Q2","Q3","Q4"]
+    dates = [("1/1/", "31/3/"), ("1/4/", "30/6/"), ("1/7/", "30/9/"), ("1/10/", "31/12/")]
+    quart = thequarters.index(quarter)
+    thisshit=(dates[quart][0] + str(year), dates[quart][1] + str(year))
+    nodes=newfaststats(thisshit[0], thisshit[1], category=category)
+    #nodes=newfaststats('1/4/2006', '30/6/2006')
+    trans = get_trans(dates[quart][0] + str(year), dates[quart][1] + str(year), restriction="None")
+    nodesup = [(i[0].upper(), i[1], i[2], i[3], i[4],i[5]) for i in nodes]  # τα κάνω κεφαλαία
+    transup = [(i[0].upper(), i[1].upper(), i[2], i[3]) for i in trans]  # τα κάνω κεφαλαία
+    # print("stage3")
+    transup = cleantrans(transup, nodesup)  # backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
+    # trans=thecleanest(trans,nodes)
+    transup = cleantransloop(transup)
+    nodesup = cleannodes(nodesup, transup)  # στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
+    #print("nodes after cleaning",nodes)
+    G = nodify(nodesup, G)  # φέρνω τους κόμβους σε καταλλληλη μορφή για το γράφημα
+    G = edgify(transup, G)  # φέρνω τις ακμές σε κατάλληλη μορφή για το γράφημα
+    # newplot(G)#κάλεσμα συνάρτησης από το plug.py για το σχεδιασμό
+    # nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
+    # plt.show()
+    # dg.plot_2d()
+    #print(nodesup,list(G.nodes()))
+    return (G,nodesup)
+    #G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year), category=category)
+
+
+def getquarter(q,year,category="None"):
+    G, finalnodes = quarters(q, year, category=category)
+    nx.write_pajek(G, f"quartersdir/{q}{year}.net")
+    g = open(f"quarters*dir/{q}{year}sup.txt", 'w+')
+    stri = ""
+    # for node in finalnodes:
+    #    stri=str(G.degree[node[0]]) +" "
+    # print(G.degree[node[0]],file=g)
+    # print(finalnodes)
+    for node in finalnodes:
+        print(node[5], G.degree(node[0]), node[3], file=g)
+    print(stri, file=g)
+    g.close()
+
+def allquarts():
+    allq=["Q1","Q2","Q3","Q4"]
+    for year in range(2005,2016):
+        for q in allq:
+            print(q,year)
+            getquarter(q,year,"None")
+
+def trigenesis(edgecoef,trianglecoef):
+    edgescov = edgecoef
+    trianglecov = trianglecoef
+    # sizecov=nodecoef*(10**(nodepower))
+    # print(sizecov)
+    # sizecov=2.349*(math.exp(-6))
+    # print(edgescov,sizecov)
+    originalgraph, nodes = slovenian("November", 2014)
+    probs = [[None] * len(nodes)] * len(nodes)
+    # print(len(probs),len(probs[1]))
+    nodenames = []
+    sizes = []
+    for node in nodes:
+        nodenames.append(node[0])
+        sizes.append(node[5])
+    # print(nodenames)
+    # print(sizes)
+    G=nx.Graph()
+    G.add_nodes_from(nodenames)
+    for i in range(len(nodenames)):
+        for j in range(i + 1):
+            logit = edgescov + trianglecov * nx.triangles(G,nodenames[i])
+            probs[i][j] = ((math.e) ** logit) / (1 + (math.e) ** (logit))
+            p = np.random.uniform(0, 1)
+            if p <= probs[i][j]:
+                G.add_edge(nodenames[i], nodenames[j])
+
+    return (G, originalgraph)
+
+def findalltriangles(G):
+    sum=0
+    for i in list(G.nodes()):
+        sum+=nx.triangles(G,i)
+        G.remove_node(i)
+    return sum
+
+def controlroom2(fromdate,todate,category="None",restriction="None",*args):
+    if args==():
+        G,thenodes=newplotting2(fromdate,todate,category,restriction)
+    elif args[0]=="country":
+        countryaggr(fromdate,todate,category)
+
+    #G=newplotting(fromdate,todate,category)
+    #newplot(G)
+    #print(nx.adjacency_matrix(G))
+    #print(type(nx.adjacency_matrix(G)))
+    #nx.write_edgelist(loseweight(G),"edgelist.txt")
+    return (G,thenodes)
+
+def newplotting2(fromdate,todate,category="None",restriction="None",aggregation="None"):
+    G = nx.DiGraph()
+    #print("stage1")
+    trans = get_trans(fromdate, todate, restriction)
+    #print("trans",trans)
+    nodes=newfaststatsx(fromdate, todate,category)
+    #print("stage2")
+    #nodes=cleannodes(nodes,trans)#αφαιρεί κόμβους που δεν έχουν ακμή(χρειάζομαι connected graph)
+    nodesup=[(i[0].upper(),i[1],i[2],i[3],i[4],i[5]) for i in nodes]#τα κάνω κεφαλαία
+    transup=[(i[0].upper(),i[1].upper(),i[2],i[3]) for i in trans]#τα κάνω κεφαλαία
+    #print("stage3")
+    transup = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
+    #trans=thecleanest(trans,nodes)
+    transup = cleantransloop(transup)
+    nodesup = cleannodes(nodesup,transup) #στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
+    #print("these are trans homie:",len(transup),"these dem nodes",len(nodesup))
+    #testingfun(nodes,trans)
+    #print(nodesup)
+    #trans = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο trans
+    G=nodify(nodesup,G)#φέρνω τους κόμβους σε καταλλληλη μορφή για το γράφημα
+    G=edgify(transup,G)#φέρνω τις ακμές σε κατάλληλη μορφή για το γράφημα
+    #newplot(G)#κάλεσμα συνάρτησης από το plug.py για το σχεδιασμό
+    #nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
+    #plt.show()
+    #dg.plot_2d()
+    return (G,nodesup)
+
+def karpf():
+    G,finalnodes=controlroom2("1/1/2005","31/12/2011")
+    nx.write_pajek(G, "karpf.net")
+    g = open("karpfsup.txt", 'w+')
+    stri = ""
+    # for node in finalnodes:
+    #    stri=str(G.degree[node[0]]) +" "
+    # print(G.degree[node[0]],file=g)
+    for node in finalnodes:
+        print(node[5], G.degree(node[0]), node[3], node[1], file=g)
+    # print(stri,file=g)
+    g.close()
+
+def catgen(edgecoeff, nodecoef=0, country=0):
+    cars = {'Regulated': [0,0.3958,4.3989],
+            'Financial': [0.3958,0.9586,3.9513],
+            'Governmental': []
+            }
+    df=pd.DataFrame()
+    edgescov = edgecoeff
+    sizecov = nodecoef
+    ethniccov = country
+    # sizecov=nodecoef*(10**(nodepower))
+    # print(sizecov)
+    # sizecov=2.349*(math.exp(-6))
+    # print(edgescov,sizecov)
+    originalgraph, nodes = slovenian("August", 2013)
+    probs = [[None] * len(nodes)] * len(nodes)
+    # print(len(probs),len(probs[1]))
+    nodenames = []
+    sizes = []
+    for node in nodes:
+        nodenames.append(node[0])
+        sizes.append(node[5])
+    # print(nodenames)
+    # print(sizes)
+    if country == 0:
+        for i in range(len(nodenames)):
+            for j in range(i + 1):
+                logit = edgescov + sizecov * (sizes[i] + sizes[j])
+                probs[i][j] = ((math.e) ** logit) / (1 + (math.e) ** (logit))
+    else:
+        for i in range(len(nodenames)):
+            for j in range(i + 1):
+                logit = edgescov + ethniccov * onefun(nodes[i][3] == nodes[j][3]) + sizecov * (sizes[i] + sizes[j])
+                probs[i][j] = ((math.e) ** logit) / (1 + (math.e) ** (logit))
+    G = nx.Graph()
+    for i in range(len(nodenames)):
+        for j in range(i + 1):
+            p = np.random.uniform(0, 1)
+            if p <= probs[i][j]:
+                G.add_edge(nodenames[i], nodenames[j])
+    return (G, originalgraph)
+
+def newfaststatsx(fromdate, todate,
+                     category="None"):  # return list of unique account holders [('node1,'category',
+    if category == "None":
+        addition = ""
+    elif "," not in category:
+        addition = f"\nand class.category = '{category}'"
+    elif len(category.split(",")) == 2:
+        things = category.split(",")
+        addition = f"\nand (class.category = '{things[0]}' or class.category = '{things[1]}')"
+    else:
+        things = category.split(",")
+        addition = f"\nand (class.category = '{things[0]}' or class.category = '{things[1]} or or class.category = '{things[2]}')"
+
+    # print("Addition","l"+addition+"l")
+    fromd = cleandate(fromdate)
+    tod = cleandate(todate)
+    sql = f"""select distinct tran.AcquiringAccountHolder, class.category, class.sector, acc.country, class.registry,size.avgTransNum
+    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class, EUTL_AccHolderTransactingSize as size
+    where tran.AcquiringAccountHolder = acc.holderName
+    and (tran.TransactionType='3-0' or tran.TransactionType='3-21' or tran.TransactionType='10-0')
+    and acc.rawCode = size.holder
+    and acc.rawCode = class.holder{addition}
+    and tran.TransactionDate 
+    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+    # print("stage1.1")
+    sql2 = f"""select distinct tran.TransferringAccountHolder, class.category, class.sector, acc.country, class.registry,size.avgTransNum
+    from Transactions_New as tran, EUTL_AccountHolders as acc,EUTL_AccHolderClassification as class, EUTL_AccHolderTransactingSize as size
+    where tran.TransferringAccountHolder = acc.holderName
+    and (tran.TransactionType='3-0' or tran.TransactionType='3-21' or tran.TransactionType='10-0')
+    and acc.rawCode = size.holder
+    and acc.rawCode = class.holder{addition}
+    and tran.TransactionDate 
+    between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'"""
+    # print("stage1.2")
+    # print(sql)
+    cursor.execute(sql)
+    acq = cursor.fetchall()
+    # print("stage1.3")
+    cursor.execute(sql2)
+    tran = cursor.fetchall()
+    # print("stage1.4")
+    all = get_unique(acq + tran)
+    # print("stage1.5")
+    # print("nodes",all)
+    return all
+
+def get_trannies(fromdate,todate,restriction="None"):
+    if restriction!="None":
+        addition= f"and NbOfUnits>{restriction}"
+    else: addition=""
+    fromd=cleandate(fromdate)
+    tod=cleandate(todate)
+    key = 1 #1 for everything in, 2 for excluding NULL,
+    if key ==1 :
+        sql = f"""select TransferringAccountHolder, AcquiringAccountHolder, NbOfUnits, TransactionType, TransferringRegistry,AcquiringRegistry
+        from Transactions_New where
+        TransactionDate 
+        between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'
+        {addition}"""
+    #If we want to exclude NULL appearances do the following
+    elif key==2 :
+        sql = f"""select TransferringAccountHolder, AcquiringAccountHolder, NbOfUnits, TransactionType, TransferringRegistry,AcquiringRegistry
+        from Transactions_New
+        where ((TransferringAccountHolder is not NULL) and (AcquiringAccountHolder is not NULL))
+        and TransactionDate between '{fromd[2]}-{fromd[1]}-{fromd[0]}' and '{tod[2]}-{tod[1]}-{tod[0]}'
+        {addition}"""
+    cursor.execute(sql)
+    tran=cursor.fetchall()
+    final=[]
+    for i in tran:
+        first=i[0]
+        second=i[1]
+        if i[0] is None:
+            first=i[4]
+        if i[1] is None:
+            second=i[5]
+        final.append((first,second,i[2],i[3],i[4]))
+    return final
+
+
+def brandnew(fromdate,todate,category="category",restriction="None"):
+    G = nx.Graph()
+    trans = get_trannies(fromdate, todate, restriction)
+    #print("trans",trans)
+    #nodes = get_unique_nodes(fromdate, todate, category)
+    # nodes=cleannodes(nodes,trans)#αφαιρεί κόμβους που δεν έχουν ακμή(χρειάζομαι connected graph)
+    #nodesup = [(i[0].upper(), i[1], i[2], i[3], i[4]) for i in nodes]  # τα κάνω κεφαλαία
+    transup = [(i[0].upper(), i[1].upper(), i[2], i[3],i[4]) for i in trans]  # τα κάνω κεφαλαία
+    #transup = cleantrans(transup, nodesup)  # backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
+    # trans=thecleanest(trans,nodes)
+    transup = cleantransloop(transup)
+    #nodesup = cleannodes(nodesup, transup)  # στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
+    # testingfun(nodes,trans)
+    # nx.draw(G, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
+    final=[]
+    for i in transup:
+        final.append((i[0],i[1]))
+    G.add_edges_from(final)
+    return G
+
+def getbigcomp(G):
+    comps = [c for c in sorted(nx.connected_components(G), key=len, reverse=True)]
+    newtrans=cleanse(list(G.edges()),comps[0])
+    newg=nx.Graph()
+    newg.add_edges_from(newtrans)
+    return newg
+
+def cleanse(trans,nodes):
+    tran=[]
+    counter=0
+    hashing=len(trans)*[1]
+    nodenames=nodes
+    for j in range(len(trans)):
+            if trans[j][0] not in nodenames or trans[j][1] not in nodenames:
+                hashing[j]=0
+    for i in range(len(trans)):
+           if hashing[i]==1:
+                tran.append(trans[i])
+    #print("counter",counter)
+    #print(tran)
+    return tran
+def showallmonths():
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    #G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    #edges=list(G.edges())
+    #count=0
+    #for edge in edges:
+    #    count+=G.get_edge_data(edge[0],edge[1])["weight"]
+    for year in range(2006,2017):
+        for month in months:
+            minas = months.index(month)
+            G = brandnew(dates[minas][0] + str(year), dates[minas][1] + str(year))
+            print(month,year)
+            nt = Network(notebook=True)
+            nt.from_nx(G)
+            # nt.show_buttons(filter=['physics'])
+            nt.show_buttons()
+            nt.show(f'showtimecountryaggreg/{month}{year}.html')
+
+def showallmonths2():
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    #G = controlroom(dates[minas][0] + str(year), dates[minas][1] + str(year))
+    #edges=list(G.edges())
+    #count=0
+    #for edge in edges:
+    #    count+=G.get_edge_data(edge[0],edge[1])["weight"]
+    for year in range(2006,2017):
+        for month in months:
+            minas = months.index(month)
+            G,_ = slovenian(month,year)
+            print(month,year)
+            nt = Network(notebook=True)
+            nt.from_nx(G)
+            # nt.show_buttons(filter=['physics'])
+            nt.show_buttons()
+            nt.show(f'showtime/{month}{year}.html')
 start=time.time()
 #get_trans("29/6/2014","30/6/2014")
 #get_unique_nodes("29/6/2014","30/6/2014")
@@ -1735,12 +2089,7 @@ start=time.time()
 #a = np.random.randint(0, 5, size=(15, 15))
 #D = nx.DiGraph(a)
 #nx.draw(D, with_labels=True, node_size=1500, alpha=0.3, arrows=True)
-#newplotting("29/6/2014","1/7/2014")
-#newplotting("29/9/2014","2/10/2014")
-#newplotting("9/2/2016","13/2/2016")
-#newplotting("5/5/2015","7/5/2015")
 #countryaggr("29/6/2014","1/7/2014")
-#newplotting("29/6/2014","30/6/2014")
 #f=open("temporary.txt","w+")
 #massstats("1/1/2014", "1/2/2014","regulated,financial")
 #f.close()
@@ -1818,12 +2167,58 @@ print(len(list4))"""
 #readfromstuff("directedsizenumber/August2013")
 #altern("November",2015)
 #artcomp()
-df=pd.read_csv("directedmonthscomparison.csv",sep=';')
-print(len(df))
-#for column_name,item in df.iteritems():
-#    print(column_name)
-#    print(item)
-#    if item == 0.8448:
-#        count=1
-#    else:
-#        count=0
+#allnightbaby()
+#altern("June",2009)
+def garbage():
+    artificial,_=trigenesis(-5.95972,2.74810)
+    melo=list(nx.isolates(artificial))
+    print(melo)
+    artificial.remove_nodes_from(melo)
+    nt = Network(notebook=True)
+    nt.from_nx(artificial)
+    #nt.show_buttons(filter=['physics'])
+    nt.show_buttons()
+    nt.show('arti.html')
+    G1=artificial
+    #print(findalltriangles(artificial))
+    G,_=slovenian("November",2014)
+    G2=G
+    #print(findalltriangles(G))
+    print("connected", nx.is_connected(artificial))
+    print("den1",nx.density(artificial),"den2",nx.density(G))
+    print(portrait_divergence(G1,G2))
+#print(list(G.nodes())[4])
+#print(type(nx.triangles(G,"CELANESE PRODUCTION GERMANY GMBH & CO. KG")))
+#allmonthspaj()
+#karpf()
+#print(get_trannies("1/6/2011","10/6/2011"))
+#art,_=genesis(-7.195,0,country=0.374)
+#G,_=slovenian("March",2015)
+def whocares():
+    G=brandnew("1/6/2011","30/6/2011")
+    G=getbigcomp(G)
+    nt = Network(notebook=True)
+    nt.from_nx(G)
+    #nt.show_buttons(filter=['physics'])
+    nt.show_buttons()
+    nt.show('arti.html')
+    g = ig.Graph.from_networkx(G)
+    """fig, (ax0, ax1) = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
+    ax1.set_title("Plot with igraph plot")
+    layout = g.layout_kamada_kawai()
+    ig.plot(g, layout=layout, target=ax1)
+    plt.axis("off")
+    plt.show()"""
+    comps=[c for c in sorted(nx.connected_components(G), key=len, reverse=True)]
+    print(comps[0])
+    print([len(c) for c in sorted(nx.connected_components(G), key=len, reverse=True)])
+custompaj("August",2012)
+"""art,_=genesis(-7.104,-4.050e-07)
+orig,_=slovenian("March",2015)
+newplot(orig)
+orig=getbigcomp(orig)
+print(portrait_divergence(art,orig))"""
+#showallmonths()
+#showallmonths2()
+
+#print(portrait_divergence(art,G))
