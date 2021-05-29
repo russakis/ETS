@@ -1547,8 +1547,8 @@ def damnindians(month,year,category="None"):
     f.close()
 
 
-def slovenian(month,year,category="None"):
-    G=nx.Graph()
+def slovenian(month,year,category="None",restriction="None"):
+    G=nx.DiGraph()
     months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
               "November", "December"]
     dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
@@ -1610,18 +1610,34 @@ def altern(month,year,category="None"):
     #print(stri,file=g)
     g.close()
 
-def custompaj(month,year,category="None"):
-    G, finalnodes = slovenian(month, year, category=category)
-    #G=getbigcomp(G)
+def custompaj(month,year,category="None",restriction="None"):
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    minas = months.index(month)
+    #G = brandnew(dates[minas][0] + str(year), dates[minas][1] + str(year), category=category)
+
+    G, finalnodes = slovenian(month, year, category=category,restriction=5)
+    G=getbigcomp(G)
+    melo=list(nx.isolates(G))
+    G.remove_nodes_from(melo)
     nx.write_pajek(G, f"latenight.net")
     g = open(f"latenightsup.txt", 'w+')
     stri = ""
     # for node in finalnodes:
     #    stri=str(G.degree[node[0]]) +" "
     # print(G.degree[node[0]],file=g)
+    temp=[]
+    for node in finalnodes:
+        if node[0] in list(G.nodes()):
+            temp.append(node)
+    finalnodes=temp
     for node in finalnodes:
         print(node[5], G.degree(node[0]), node[3], node[1], file=g)
-    # print(stri,file=g)
+    #print(stri,file=g)
+    print("finished")
     g.close()
 
 
@@ -2081,7 +2097,104 @@ def showallmonths2():
             # nt.show_buttons(filter=['physics'])
             nt.show_buttons()
             nt.show(f'showtime/{month}{year}.html')
+
+def showingfun(month,year,category="None"):
+    print(month,year)
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+    dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
+             ("1/6/", "30/6/"), ("1/7/", "31/7/"), ("1/8/", "31/8/")
+        , ("1/9/", "30/9/"), ("1/10/", "31/10/"), ("1/11/", "30/11/"), ("1/12/", "31/12/")]
+    minas = months.index(month)
+    govnodes = newfaststats(dates[minas][0] + str(year), dates[minas][1] + str(year), category="governmental")
+    finnodes = newfaststats(dates[minas][0] + str(year), dates[minas][1] + str(year), category="financial")
+    regnodes = newfaststats(dates[minas][0] + str(year), dates[minas][1] + str(year), category="regulated")
+    govnodes = [(i[0].upper(), i[1], i[2], i[3], i[4],i[5]) for i in govnodes]  # τα κάνω κεφαλαία
+    finnodes = [(i[0].upper(), i[1], i[2], i[3], i[4],i[5]) for i in finnodes]  # τα κάνω κεφαλαία
+    regnodes = [(i[0].upper(), i[1], i[2], i[3], i[4],i[5]) for i in regnodes]  # τα κάνω κεφαλαία
+    regnodes = [node[0] for node in regnodes]
+    finnodes = [node[0] for node in finnodes]
+    govnodes = [node[0] for node in govnodes]
+
+    newgovnodes=newfinnodes=newregnodes=[]
+    G, finalnodes = slovenian(month, year, category)
+    """for node in govnodes:
+        if node in finalnodes:
+            newgovnodes.append(node)
+    for node in finnodes:
+        if node in finalnodes:
+            newfinnodes.append(node)
+    for node in regnodes:
+        if node in finalnodes:
+            newregnodes.append(node)"""
+    for node in list(G.nodes()):
+        if node in regnodes:
+            G.nodes[node]['group'] = 2
+        elif node in finnodes:
+            G.nodes[node]['group'] = 3
+        elif node in govnodes:
+            G.nodes[node]['group'] = 1
+    """for node in newgovnodes:
+        G.nodes[node]['group']=1
+    for node in newfinnodes:
+        G.nodes[node]['group'] = 2
+    for node in newregnodes:
+        G.nodes[node]['group']=3"""
+    nt = Network(notebook=True)
+    nt.from_nx(G)
+    # nt.show_buttons(filter=['physics'])
+    nt.show_buttons()
+    nt.show(f'showfundirected/{month}{year}.html')
+
+def deggenesis(edgecoeff,nodecoef=0,country=0):
+    edgescov=edgecoeff
+    sizecov=nodecoef
+    ethniccov=country
+    #sizecov=nodecoef*(10**(nodepower))
+    #print(sizecov)
+    #sizecov=2.349*(math.exp(-6))
+    #print(edgescov,sizecov)
+    originalgraph,nodes=slovenian("August",2013,restriction=5)
+    probs=[[None]*len(nodes)]*len(nodes)
+    #print(len(probs),len(probs[1]))
+    nodenames=[]
+    sizes=[]
+    for node in nodes:
+        nodenames.append(node[0])
+        sizes.append(node[5])
+    #print(nodenames)
+    #print(sizes)
+    if country==0:
+        for i in range(len(nodenames)):
+            for j in range(i+1):
+                logit=edgescov+sizecov*(originalgraph.degree(nodenames[i])+originalgraph.degree(nodenames[j]))
+                probs[i][j]=((math.e)**logit)/(1+(math.e)**(logit))
+    else:
+        for i in range(len(nodenames)):
+            for j in range(i + 1):
+                logit = edgescov + ethniccov * onefun(nodes[i][3] == nodes[j][3])+sizecov*(originalgraph.degree(nodenames[i])+originalgraph.degree(nodenames[j]))
+                probs[i][j] = ((math.e) ** logit) / (1 + (math.e) ** (logit))
+    G=nx.Graph()
+    for i in range(len(nodenames)):
+        for j in range(i+1):
+            p=np.random.uniform(0,1)
+            if p<= probs[i][j]:
+                G.add_edge(nodenames[i],nodenames[j])
+    return (G,originalgraph)
+
+def automation():
+    direc=os.system("cd PycharmProjects/secondtry")
+    print("`cd ~` ran with exit code %d" % direc)
+    for month in months:
+        for year in range(2014,2016):
+            toleda(month,year)
+    for month in months:
+        for year in range(2014,2016):
+            gimme=os.system(f"./Directed_Graphlet_Counter_v3 {month}{year}.gw")
+
 start=time.time()
+months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
 #get_trans("29/6/2014","30/6/2014")
 #get_unique_nodes("29/6/2014","30/6/2014")
 #plotting("29/6/2014","30/7/2014")
@@ -2193,7 +2306,7 @@ def garbage():
 #karpf()
 #print(get_trannies("1/6/2011","10/6/2011"))
 #art,_=genesis(-7.195,0,country=0.374)
-#G,_=slovenian("March",2015)
+#G,_=slovenian("August",2012)
 def whocares():
     G=brandnew("1/6/2011","30/6/2011")
     G=getbigcomp(G)
@@ -2212,7 +2325,11 @@ def whocares():
     comps=[c for c in sorted(nx.connected_components(G), key=len, reverse=True)]
     print(comps[0])
     print([len(c) for c in sorted(nx.connected_components(G), key=len, reverse=True)])
-custompaj("August",2012)
+
+
+
+#cust=custompaj("March",2014)
+#showingfun("March", 2014)
 """art,_=genesis(-7.104,-4.050e-07)
 orig,_=slovenian("March",2015)
 newplot(orig)
@@ -2220,5 +2337,17 @@ orig=getbigcomp(orig)
 print(portrait_divergence(art,orig))"""
 #showallmonths()
 #showallmonths2()
-
+#art,_=trigenesis(-7.28601 ,4.02247)
+#art,_=genesis(-7.122,2.221e-06)
+#art,_=deggenesis(-7.1455038,-0.0009901)
+#showingfun("February",2015)
+#G,_=slovenian("March",2014,restriction=5)
+#G=getbigcomp(G)
+#print([len(c) for c in sorted(nx.connected_components(G), key=len, reverse=True)])
+#for year in range(2012,2015):
+#    for month in months:
+#    showingfun("August",year)
+automation()
+#showingfun("August",2015)
 #print(portrait_divergence(art,G))
+
