@@ -865,58 +865,6 @@ def edgeli(month,year):
         #print(edge[0],edge[1],file=f)
     f.close()
 
-def jacc(fromdate1,todate1,fromdate2,todate2):
-    G1 = controlroom(fromdate1, todate1)
-    G2 = controlroom(fromdate2, todate2)
-    H1 = loseweight(G1)
-    H2 = loseweight(G2)
-    G3 = nx.to_undirected(H1)
-    G4 = nx.to_undirected(H2)
-    edges1=list(G3.edges)
-    edges2=list(G4.edges)
-    jacc=netrd.distance.JaccardDistance().dist(G3,G4)
-    print(jacc)
-
-def lsd(fromdate1,todate1,fromdate2,todate2):
-    G1 = controlroom(fromdate1, todate1)
-    G2 = controlroom(fromdate2, todate2)
-    H1 = loseweight(G1)
-    H2 = loseweight(G2)
-    G3 = nx.to_undirected(H1)
-    G4 = nx.to_undirected(H2)
-    lsd = netrd.distance.NetLSD().dist(G3,G4)
-    print(lsd)
-
-def lapl(fromdate1,todate1,fromdate2,todate2):
-    G1 = controlroom(fromdate1, todate1)
-    G2 = controlroom(fromdate2, todate2)
-    H1 = loseweight(G1)
-    H2 = loseweight(G2)
-    G3 = nx.to_undirected(H1)
-    G4 = nx.to_undirected(H2)
-    lapl = netrd.distance.LaplacianSpectral().dist(G3,G4)
-    print(lapl)
-
-def portrait(fromdate1,todate1,fromdate2,todate2):
-    G1 = controlroom(fromdate1, todate1)
-    G2 = controlroom(fromdate2, todate2)
-    H1 = loseweight(G1)
-    H2 = loseweight(G2)
-    G3 = nx.to_undirected(G1)
-    G4 = nx.to_undirected(G2)
-    H3 = loseweight(G3)
-    H4 = loseweight(G4)
-    portrait = netrd.distance.PortraitDivergence().dist(G3,G4)
-    portrait2 = netrd.distance.PortraitDivergence().dist(H3,H4)
-    print(portrait,portrait2)
-    port1 = portrait_divergence_weighted(G3,G4)
-    port2 = portrait_divergence(H3,H4)
-    port3 = portrait_divergence_weighted(G1,G2)
-    port4 = portrait_divergence_weighted(H1,H2)
-    print("this be some new undirected shit",port1,port2)
-    print("this be some new directed shit",port3,port4)
-
-
 def example():
     G1 = nx.Graph()
     G2 = nx.Graph()
@@ -1555,8 +1503,11 @@ def damnindians(month,year,category="None"):
     f.close()
 
 
-def slovenian(month,year,category="None",restriction="None",types="None"):
-    G=nx.Graph()
+def slovenian(month,year,category="None",restriction="None",types="None",directed=False):
+    if directed==False:
+        G = nx.Graph()
+    else:
+        G = nx.DiGraph()
     months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
               "November", "December"]
     dates = [("1/1/", "31/1/"), ("1/2/", "28/2/"), ("1/3/", "31/3/"), ("1/4/", "30/4/"), ("1/5/", "31/5/"),
@@ -1805,14 +1756,14 @@ def quarters(quarter,year,category="None",types="None"):
 def getquarter(q,year,category="None"):
     G, finalnodes = quarters(q, year, category=category)
     nx.write_pajek(G, f"quartersdir/{q}{year}.net")
-    g = open(f"quarters*dir/{q}{year}sup.txt", 'w+')
+    g = open(f"quartersdir/{q}{year}sup.txt", 'w+')
     stri = ""
     # for node in finalnodes:
     #    stri=str(G.degree[node[0]]) +" "
     # print(G.degree[node[0]],file=g)
     # print(finalnodes)
     for node in finalnodes:
-        print(node[5], G.degree(node[0]), node[3], file=g)
+        print(node[5], G.degree(node[0]), node[3], G.nodes[node[0]]["category"], file=g)
     print(stri, file=g)
     g.close()
 
@@ -1867,29 +1818,21 @@ def controlroom2(fromdate,todate,category="None",restriction="None",*args,types=
 
     #G=newplotting(fromdate,todate,category)
     #newplot(G)
-    #print(nx.adjacency_matrix(G))
-    #print(type(nx.adjacency_matrix(G)))
     #nx.write_edgelist(loseweight(G),"edgelist.txt")
     return (G,thenodes)
 
 def newplotting2(fromdate,todate,category="None",restriction="None",aggregation="None",types="None"):
     G = nx.DiGraph()
-    #print("stage1")
     trans = get_trans(fromdate, todate, restriction,types=types)
-    #print("trans",trans)
     nodes=newfaststatsx(fromdate, todate,category)
-    #print("stage2")
     #nodes=cleannodes(nodes,trans)#αφαιρεί κόμβους που δεν έχουν ακμή(χρειάζομαι connected graph)
     nodesup=[(i[0].upper(),i[1],i[2],i[3],i[4],i[5]) for i in nodes]#τα κάνω κεφαλαία
     transup=[(i[0].upper(),i[1].upper(),i[2],i[3]) for i in trans]#τα κάνω κεφαλαία
-    #print("stage3")
     transup = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο nodes
     #trans=thecleanest(trans,nodes)
     transup = cleantransloop(transup)
     nodesup = cleannodes(nodesup,transup) #στην περίεργη περίπτωση μεμονωμένου κόμβου που δε μας χρησιμεύει
-    #print("these are trans homie:",len(transup),"these dem nodes",len(nodesup))
     #testingfun(nodes,trans)
-    #print(nodesup)
     #trans = cleantrans(transup,nodesup) #backup κατάλοιπο για κόμβους που δεν υπάρχουν στο trans
     G=nodify(nodesup,G)#φέρνω τους κόμβους σε καταλλληλη μορφή για το γράφημα
     G=edgify(transup,G)#φέρνω τις ακμές σε κατάλληλη μορφή για το γράφημα
@@ -2394,6 +2337,118 @@ def girvancommies(i):
     for i in cat2:
         print(i,file=f2)
 
+def starboy(G,k=4):
+    stars=0
+    sameco = 0
+    difco = 0
+    homos=[]
+    uniqueValues = list({val for val in nx.get_node_attributes(G, 'country').values()})
+    allnodes=list(G.nodes())
+    allneighs=[]
+    finalproduct=[]
+    for value in uniqueValues:
+        temp = len([n for n in G.nodes() if G.nodes[n]["country"]== value])
+        homos.append(temp * (temp - 1) / (len(list(G.nodes())) * ((len(list(G.nodes()))) - 1)))
+    testvector=[]
+    for node in list(G.nodes()):
+        starboys=[]
+        neighbors=[n for n in G.neighbors(node)]
+        degoneneighbors = [n for n in neighbors if G.degree[n]==1]
+        #print("lenneigh",len(neighbors))
+        #print("lendegone",len(degoneneighbors))
+        if len(degoneneighbors)>=k:
+            for node2 in degoneneighbors:
+                sameco = 0
+                difco = 0
+                if G.nodes[node]["country"]==G.nodes[node2]["country"]:
+                    sameco+=1
+                else:
+                    difco+=1
+            allneighs.append(sameco+difco)
+            testvector.append(sameco/(sameco+difco))
+            starboys.append(node)
+            stars+=1
+    finalvector=[]
+    for i in range(len(testvector)):
+        finalvector.append((testvector[i]- homos[i]))
+        finalproduct.append(finalvector[i]*allneighs[i]/sum(allneighs))
+    print(sum(finalproduct))
+    return sameco*100/(sameco+difco)
+    #return (stars,starboys)
+
+def simplestar(G,k=4):
+    stars=0
+    for node in list(G.nodes()):
+        starboys = []
+        neighbors = [n for n in G.neighbors(node)]
+        degoneneighbors = [n for n in neighbors if G.degree[n] == 1]
+        if len(degoneneighbors) >= k:
+            starboys.append(node)
+            stars += 1
+    return (stars,starboys)
+
+def myread(filename):
+    f=open(filename,"r")
+    verts = f.readline().split(" ")[1]
+    print(verts)
+    categ = []
+    nodenames= []
+    codes= []
+    for vert in range(int(verts)):
+        line=f.readline().split("\"")
+        nodenames.append(line[1])
+        codes.append(line[0])
+        print(line[0])
+        lastpart=line[2].split(" ")
+        cat=lastpart[-1]
+        categ.append(cat)
+    f.readline()
+    edges=[]
+    while(True):
+        lineread=f.readline()
+        if lineread=="":
+            break
+        line=lineread.split(" ")
+        weight=line[2].split("\\")
+        weight=weight[0]
+        #edges.append((nodenames[codes.index(line[0])],nodenames[codes.index(line[1])],line[2]))
+        edges.append((nodenames[int(line[0])-1],nodenames[int(line[1])-1],weight))
+    G=nx.Graph()
+    G.add_weighted_edges_from(edges)
+    nx.set_node_attributes(G, categ, "category")
+    return G
+
+def latestfunction():
+    for month in months:
+        print(month)
+        G,_=slovenian(month,2013)
+        data = nx.attribute_mixing_matrix(G, "category", mapping={"regulated": 0, "governmental": 1, "financial": 2})
+        gov = [node for node in list(G.nodes()) if G.nodes[node]["category"] == "governmental"]
+        fin = [node for node in list(G.nodes()) if G.nodes[node]["category"] == "financial"]
+        reg = [node for node in list(G.nodes()) if G.nodes[node]["category"] == "regulated"]
+        edg = len(list(G.edges())) * len(list(G.edges()))
+        ran = [[len(reg)*len(reg)/edg,len(reg)*len(gov)/edg,len(reg)*len(fin)/edg],
+               [len(gov)*len(reg)/edg,len(gov)*len(gov)/edg,len(gov)*len(fin)/edg],
+               [len(fin)*len(reg)/edg,len(fin)*len(gov)/edg,len(fin)*len(fin)/edg]]
+        final=np.subtract(np.array(data),np.array(ran))
+        #data = np.asarray(data)
+    #print(data)
+
+        fig = plt.figure(num=None, figsize=(8, 6), dpi=80, facecolor='w', edgecolor='k')
+        plt.clf()
+        ax = fig.add_subplot(111)
+        ax.set_aspect(1)
+        res = sns.heatmap(final, annot=True, fmt='.3f', cmap="YlGnBu", vmin=-1.0, vmax=1.0)
+        plt.title(f'Mixing Matrix for Categories for {month} 2013',fontsize=12)
+        plt.xticks([i+0.5 for i in range(final.shape[0])], ['reg', 'gov', 'fin'])
+        plt.xticks(rotation=0)
+
+        plt.yticks([i+0.5 for i in range(final.shape[1])], ['reg', 'gov', 'fin'])
+        plt.yticks(rotation=0)
+        plt.savefig(f"homo{month}2013.png", bbox_inches='tight', dpi=100)
+        #plt.show()
+
+
 start=time.time()
 months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
               "November", "December"]
@@ -2472,36 +2527,12 @@ print(len(list4))"""
 #allmonthspaj()
 #help()
 #artificial,originalgraph= genesis()
-#G,_=slovenian("August",2015)
 #central = nx.betweenness_centrality(G)
 #central2=dict(sorted(central.items(),key= lambda x:x[1]))
 #print(central2)
-#G,originalgraph= genesis()
-#originalgraph,_=slovenian("August",2012)
-#print(portrait_divergence(G,artificial))
 #readfromstuff("directedsizenumber/August2013")
-#altern("November",2015)
 #artcomp()
 #allnightbaby()
-#altern("June",2009)
-def garbage():
-    artificial,_=trigenesis(-5.95972,2.74810)
-    melo=list(nx.isolates(artificial))
-    print(melo)
-    artificial.remove_nodes_from(melo)
-    nt = Network(notebook=True)
-    nt.from_nx(artificial)
-    #nt.show_buttons(filter=['physics'])
-    nt.show_buttons()
-    nt.show('arti.html')
-    G1=artificial
-    #print(findalltriangles(artificial))
-    G,_=slovenian("November",2014)
-    G2=G
-    #print(findalltriangles(G))
-    print("connected", nx.is_connected(artificial))
-    print("den1",nx.density(artificial),"den2",nx.density(G))
-    print(portrait_divergence(G1,G2))
 #print(list(G.nodes())[4])
 #print(type(nx.triangles(G,"CELANESE PRODUCTION GERMANY GMBH & CO. KG")))
 #allmonthspaj()
@@ -2577,35 +2608,6 @@ for node in list(G.nodes()):
 nx.set_node_attributes(G, ass, "ass")
 nodes=list(G.nodes())
 print(G.nodes[random.choice(nodes)]["ass"])"""
-def latestfunction():
-    for month in months:
-        print(month)
-        G,_=slovenian(month,2014)
-        data = nx.attribute_mixing_matrix(G, "category", mapping={"regulated": 0, "governmental": 1, "financial": 2})
-        gov = [node for node in list(G.nodes()) if G.nodes[node]["category"] == "governmental"]
-        fin = [node for node in list(G.nodes()) if G.nodes[node]["category"] == "financial"]
-        reg = [node for node in list(G.nodes()) if G.nodes[node]["category"] == "regulated"]
-        edg = len(list(G.edges())) * len(list(G.edges()))
-        ran = [[len(reg)*len(reg)/edg,len(reg)*len(gov)/edg,len(reg)*len(fin)/edg],
-               [len(gov)*len(reg)/edg,len(gov)*len(gov)/edg,len(gov)*len(fin)/edg],
-               [len(fin)*len(reg)/edg,len(fin)*len(gov)/edg,len(fin)*len(fin)/edg]]
-        final=np.subtract(np.array(data),np.array(ran))
-        #data = np.asarray(data)
-    #print(data)
-
-        fig = plt.figure(num=None, figsize=(8, 6), dpi=80, facecolor='w', edgecolor='k')
-        plt.clf()
-        ax = fig.add_subplot(111)
-        ax.set_aspect(1)
-        res = sns.heatmap(final, annot=True, fmt='.3f', cmap="YlGnBu", vmin=-1.0, vmax=1.0)
-        plt.title(f'Mixing Matrix for Categories for {month} 2014',fontsize=12)
-        plt.xticks([i+0.5 for i in range(final.shape[0])], ['reg', 'gov', 'fin'])
-        plt.xticks(rotation=0)
-
-        plt.yticks([i+0.5 for i in range(final.shape[1])], ['reg', 'gov', 'fin'])
-        plt.yticks(rotation=0)
-        plt.savefig(f"homo{month}2014.png", bbox_inches='tight', dpi=100)
-        #plt.show()
 
 #result = pyreadr.read_r('varsALLTrans_netStats.RData')
 #print(type(result))
@@ -2626,16 +2628,6 @@ print(lens)"""
 #G1,_=slovenian("April",2015)
 #plot_degree_dist(G1)
 #karpf()
-
-"""G,_=slovenian("May",2014)
-print(nx.density(G))
-#G=getbigcomp(G)
-G1,_=slovenian("May",2015)
-print(nx.density(G1))
-#G1=getbigcomp(G1)
-print(nx.density(G),nx.density(G1))
-print(portrait_divergence(G,G1))
-print(portrait_divergence())"""
 #print(nx.is_weighted(G),nx.is_weighted(G1))
 #print(portrait_divergence(G,G1))
 #print(portrait_divergence(art,G))
@@ -2676,48 +2668,8 @@ print(lengths)"""
     savecommies(i)"""
 
 #print(G[nodes[3]]["category"])
-def pars(file):
-    f=open(file)
-    verts= f.readline().split(" ")[1]
-    print(verts)
-    categ=[]
-    for vert in range(int(verts)):
-        line=f.readline().split("\"")
-        lastpart=line[2].split(" ")
-        cat=lastpart[-1]
-        categ.append(cat)
-    return categ
 
-def myread(filename):
-    f=open(filename,"r")
-    verts = f.readline().split(" ")[1]
-    print(verts)
-    categ = []
-    nodenames= []
-    codes= []
-    for vert in range(int(verts)):
-        line=f.readline().split("\"")
-        nodenames.append(line[1])
-        codes.append(line[0])
-        print(line[0])
-        lastpart=line[2].split(" ")
-        cat=lastpart[-1]
-        categ.append(cat)
-    f.readline()
-    edges=[]
-    while(True):
-        lineread=f.readline()
-        if lineread=="":
-            break
-        line=lineread.split(" ")
-        weight=line[2].split("\\")
-        weight=weight[0]
-        #edges.append((nodenames[codes.index(line[0])],nodenames[codes.index(line[1])],line[2]))
-        edges.append((nodenames[int(line[0])-1],nodenames[int(line[1])-1],weight))
-    G=nx.Graph()
-    G.add_weighted_edges_from(edges)
-    nx.set_node_attributes(G, categ, "category")
-    return G
+
 
 """categ=pars("sub1edgelist0.net")
 fh = open("sub1edgelist", "r")
@@ -2756,31 +2708,7 @@ for edge in edges:
         edges.remove(edge)
         edges.remove((edge[1],edge[0]))"""
 
-"""for year in range(2013,2016):
-    for month in months:
-        showingfun(month,year,types=["3-0","3-21","10-0"],directory="showkarpftypes/")"""
 
-#showingfun("September",2013,types=["3-0","3-21","10-0"],directory="showkarpftypes/")
-#tran1=get_trans("1/2/2013","28/2/2013",types=["3-0","3-21","10-0"])
-#tran2=get_trans("1/2/2013","28/2/2013")
-#print(len(tran1),len(tran2))
-"""for month in months:
-    res1=month+" & "
-    res2=month+" & "
-    for year in range(2013,2016):
-        G,_=slovenian(month,year,types=["3-0","3-21","10-0"])
-        G1, _ = slovenian(month, year)
-        res1+=str((len(list(G.edges()))))+" & "
-        res2 += str((len(list(G1.edges())))) + " & "
-    print(res1)
-    print(res2)"""
-#G,_=slovenian("June",2013,types=["3-0","3-21","10-0"])
-#G1,_=slovenian("June",2013)
-#print(len(list(G.edges())),len(list(G1.edges())))
-
-#print(nx.attribute_assortativity_coefficient(G,"category"))
-
-#print(data)
 #latestfunction()
 from fluidity import asyn_fluidc
 """G,_=slovenian("June",2014)
@@ -2805,33 +2733,6 @@ print(len(list(G1.nodes())))"""
         print(lens)
         print(len(list(G1.nodes())))"""
 #savecommies(69)
-"""origin,_=slovenian("September",2015)
-G=myread("sub1edgelist2909.net")
-part1=G=origin.subgraph(list(G.nodes()))
-for node in list(part1.nodes()):
-    if part1.nodes[node]["category"] == "regulated":
-        part1.nodes[node]['group'] = 1
-    elif part1.nodes[node]["category"] == "financial":
-        part1.nodes[node]['group'] = 2
-    elif part1.nodes[node]["category"] == "governmental":
-        part1.nodes[node]['group'] = 3
-nt = Network(notebook=True)
-nt.from_nx(part1)
-nt.show_buttons()
-nt.show(f"thisonesub2909.html")
-G=myread("sub1edgelist2910.net")
-part2=origin.subgraph(list(G.nodes()))
-for node in list(part2.nodes()):
-    if part2.nodes[node]["category"] == "regulated":
-        part2.nodes[node]['group'] = 1
-    elif part2.nodes[node]["category"] == "financial":
-        part2.nodes[node]['group'] = 2
-    elif part2.nodes[node]["category"] == "governmental":
-        part2.nodes[node]['group'] = 3
-nt = Network(notebook=True)
-nt.from_nx(part1)
-nt.show_buttons()
-nt.show(f"thisothersub2910.html")"""
 
 #arti,_=mixingartist(-7.7023,mix=[3.4377,5.1907,8.3954,2.5529,5.3712,0])
 #print(portrait_divergence(G,arti))
@@ -2855,7 +2756,6 @@ for node in reg:
 
 print("fin",fincountry,"reg",regcountry)"""
 
-#altern("February",2014)
 """G, _ = slovenian("June", 2014)
 G1 = getbigcomp(G)
 G = G.subgraph(list(G1.nodes()))
@@ -2879,10 +2779,8 @@ d=[n for n in c]
 print("thisbethatc",d[1])"""
 #girvancommies(2)
 #savecommies(2909)
-for year in range(2006,2016):
-    for month in months:
-        showingfun(month,year,directory="show10-0/",types=["10-0","3-0","3-21"])
-
 #G,_=slovenian("June",2014)
+#starboy(G)
 #print(OrderedDict(nx.edge_betweenness_centrality(G).items))
 #print(nx.edge_betweenness_centrality(G))
+#allquarts()
